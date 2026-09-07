@@ -18,7 +18,7 @@ for (const f of FIXTURES) {
   const again = deriveGarden(f.snapshot.address.toUpperCase(), f.snapshot);
   ok(JSON.stringify(again) === JSON.stringify(g), `derive ${f.name}: deterministic + case-insensitive`);
 }
-ok(guestGarden().plotCount === 4, 'guest garden has 4 plots');
+ok(guestGarden().plotCount === 10, 'guest garden has 10 plots');
 ok(addressHash('0xabc') === addressHash('0xABC'), 'addressHash case-insensitive');
 // stock decor never touches gameplay (I-3)
 {

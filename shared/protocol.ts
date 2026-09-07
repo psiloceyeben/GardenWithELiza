@@ -129,6 +129,7 @@ export type ServerMsg =
   | { t: 'error'; text: string }
   | { t: 'nonce'; address: string; message: string }
   | { t: 'linked'; address: string | null; land: LandView; plotCount: number; rarityFloor: Tier }
+  | { t: 'identity'; id: string; secret: string; name: string }   // wallet sign-in adopted an existing player: store and reconnect as them
   | { t: 'wild'; add?: Wild[]; remove?: string[]; all?: Wild[] }
   | { t: 'event'; ev: VillageEvent | null }
   | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }

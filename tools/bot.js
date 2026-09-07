@@ -157,6 +157,14 @@ class Bot {
   let board = null; const origOnA3 = alice.on.bind(alice); alice.on = (m) => { if (m.t === 'board') board = m; origOnA3(m); };
   alice.send({ t: 'villages' }); alice.send({ t: 'sprint' }); await sleep(500);
   check(bob.you.weekly && bob.you.weekly.steals >= 1, `weekly trophies count Bob's steal (${bob.you.weekly && bob.you.weekly.steals})`);
+  // ten starting plots; wallet sign-in adopts the existing player who owns the address
+  check(bob.you.plotCount === 10 && bob.you.plots.length === 10, `new players start with 10 plots (${bob.you.plotCount})`);
+  const dave = new Bot('Dave'); await dave.connect();
+  let ident = null; let dnonce = null; const origOnD = dave.on.bind(dave); dave.on = (m) => { if (m.t === 'identity') ident = m; if (m.t === 'nonce') dnonce = m; origOnD(m); };
+  dave.send({ t: 'nonce', address }); await sleep(400);
+  dave.send({ t: 'link', address, signature: SIG.signForTest(dnonce.message, priv).signature }); await sleep(800);
+  check(!!ident && ident.id === alice.id && ident.secret && ident.secret !== alice.secret, 'wallet sign-in on a new device adopts the wallet owner (fresh secret issued)');
+  dave.ws.close();
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS');
   alice.ws.close(); bob.ws.close(); process.exit(fails.length ? 1 : 0);
 })();

@@ -5,6 +5,7 @@ import * as P from '@shared/protocol';
 import { COPY, TIER_NAME, MUTATION_NAME, MUTATION_FLAVOR, speciesById } from '../content';
 import type { WorldScene } from '../scenes/WorldScene';
 import { sfx } from '../audio';
+import { detectWallets } from '../wallet';
 
 type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land' | 'villages';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -23,6 +24,7 @@ export class Hud {
     $('panel-close').addEventListener('click', () => this.close());
     $('btn-conveyor').textContent = COPY.conveyorShort; $('btn-seeds').textContent = COPY.bag; $('btn-shop').textContent = COPY.shop;
     $('btn-feed').textContent = COPY.feed.split(' ')[1] ?? COPY.feed; $('btn-emotes').textContent = COPY.emotes; $('btn-odds').textContent = COPY.odds; $('btn-land').textContent = COPY.landTitle.split(' ')[1] ?? COPY.landTitle;
+    $('btn-zoom').addEventListener('click', () => this.scene.toggleZoom()); $('btn-zoom').textContent = COPY.zoom;
     const mute = $('btn-mute'); const paintMute = () => { mute.textContent = sfx.muted ? '♪ ' + COPY.off : '♪ ' + COPY.on; }; paintMute();
     mute.addEventListener('click', () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); });
     const chat = $<HTMLInputElement>('chat'); chat.placeholder = COPY.chatPlaceholder;
@@ -32,12 +34,22 @@ export class Hud {
   }
 
   // ------------------------------------------------------------ identity
-  askName(cb: (name: string) => void): void {
+  askName(cb: (name: string, walletId: string | null) => void): void {
     const m = $('name-modal'); m.hidden = false;
-    $('name-title').textContent = COPY.namePrompt; $('name-go').textContent = COPY.enter;
-    const inp = $<HTMLInputElement>('name-input'); inp.focus();
-    const go = () => { const n = inp.value.replace(/[^\w \-'.]/g, '').trim().slice(0, 16); if (n.length < 2) { inp.focus(); return; } m.hidden = true; cb(n); };
+    $('name-title').textContent = COPY.signIn; $('name-go').textContent = COPY.guestEnter; $('name-or').textContent = COPY.orGuest; $('name-hint').textContent = COPY.walletHint;
+    $('wallets').innerHTML = this.walletButtons();
+    const inp = $<HTMLInputElement>('name-input'); inp.placeholder = COPY.namePrompt;
+    const nameOf = () => inp.value.replace(/[^\w \-'.]/g, '').trim().slice(0, 16);
+    const go = () => { const n = nameOf(); if (n.length < 2) { inp.focus(); return; } m.hidden = true; cb(n, null); };
     $('name-go').addEventListener('click', go); inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' || e.keyCode === 13) go(); });
+    $('wallets').querySelectorAll<HTMLButtonElement>('[data-wallet]').forEach((b) => b.addEventListener('click', () => { const n = nameOf() || `Gardener ${Math.floor(Math.random() * 900 + 100)}`; m.hidden = true; cb(n, b.dataset.wallet!); }));
+  }
+
+  /** The four wallet options; missing ones show an install link instead of a button. */
+  walletButtons(): string {
+    return `<div class="wallets">${detectWallets().map(({ def, installed }) => installed
+      ? `<button data-wallet="${def.id}">${def.name}</button>`
+      : `<span class="wallet-missing">${def.name} · ${COPY.notInstalled} <a href="${def.url}" target="_blank" rel="noopener">${COPY.install}</a></span>`).join('')}</div>`;
   }
 
   // ------------------------------------------------------------ joystick (touch)
@@ -162,11 +174,11 @@ export class Hud {
         + `<div class="row"><span>${COPY.landFloor}</span><span class="t-${you.rarityFloor}">${TIER_NAME[you.rarityFloor]}</span></div>`
         + (addr ? `<div class="row"><span>${COPY.landTree}</span><span>${stages[land.treeStage]}</span></div><div class="row"><span>${COPY.landStumps}</span><span>${land.witherMarks}</span></div><div class="row"><span>${COPY.landHybrids}</span><span>${land.hybrids ? '✓' : '—'}</span></div>` : '')
         + `<div class="note">${COPY.connectHint}</div><div class="buy" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">`
-        + (addr ? `<button id="btn-share">${COPY.share}</button><button id="btn-unlink">${COPY.disconnect}</button>` : `<button id="btn-connect">${COPY.connect}</button>`) + `</div>`;
+        + (addr ? `<button id="btn-share">${COPY.share}</button><button id="btn-unlink">${COPY.disconnect}</button>` : this.walletButtons()) + `</div>`;
+      body.querySelectorAll<HTMLButtonElement>('[data-wallet]').forEach((b) => b.addEventListener('click', () => void this.scene.connectWallet(b.dataset.wallet!)));
       const plants = you.plots.map((p, i) => p ? `<div class="row"><span>${esc(speciesById(p.speciesId).name)}</span><span><input data-nick="${i}" maxlength="14" value="${esc(p.nick ?? '')}" placeholder="${COPY.nickPrompt}" style="width:130px;padding:4px 6px;font-size:8px"></span></div>` : '').join('');
       body.innerHTML += `<div class="note">${COPY.myPlants}. ${COPY.nickHint}</div>${plants}`;
       body.querySelectorAll<HTMLInputElement>('[data-nick]').forEach((inp) => { inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { this.scene.nick(Number(inp.dataset.nick), inp.value); inp.blur(); this.toast(COPY.nickSet); } }); inp.addEventListener('change', () => this.scene.nick(Number(inp.dataset.nick), inp.value)); });
-      body.querySelector('#btn-connect')?.addEventListener('click', () => void this.scene.connectWallet());
       body.querySelector('#btn-unlink')?.addEventListener('click', () => this.scene.unlinkWallet());
       body.querySelector('#btn-share')?.addEventListener('click', () => { if (share) { navigator.clipboard?.writeText(share).catch(() => undefined); this.toast(`${COPY.shareCopied}: ${share}`, 5000); } });
     } else {

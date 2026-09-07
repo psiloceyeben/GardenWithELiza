@@ -48,6 +48,10 @@
     .row { display:flex; justify-content:space-between; padding:3px 0; font-size:8px; }
     .note { color:var(--dim); font-size:7px; line-height:1.6; margin-top:4px; }
     .emotes { display:flex; gap:8px; flex-wrap:wrap; } .emotes button { font-size:18px; }
+    .wallets { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:8px 0; }
+    .wallets button { width:100%; }
+    .wallet-missing { font-size:7px; color:var(--dim); padding:6px; border:2px dashed #000; }
+    .wallet-missing a { color:var(--sap); }
     #banner { position:fixed; top:40px; left:50%; transform:translateX(-50%); background:rgba(60,40,20,.92); border:2px solid var(--sap); color:var(--sap); padding:6px 12px; font-size:8px; text-align:center; pointer-events:none; z-index:6; line-height:1.6; }
     #banner[hidden] { display:none; }
     #toast { position:fixed; top:64px; left:50%; transform:translateX(-50%); background:rgba(24,18,32,.92); border:2px solid var(--edge); padding:8px 12px; font-size:8px; max-width:70vw; text-align:center; transition:opacity .3s; opacity:0; pointer-events:none; line-height:1.6; z-index:6; }
@@ -85,11 +89,12 @@
     <button data-panel="emotes" id="btn-emotes">Emotes</button>
     <button data-panel="land" id="btn-land">Land</button>
     <button data-panel="odds" id="btn-odds">Odds</button>
+    <button id="btn-zoom">Zoom</button>
     <button id="btn-mute">♪</button>
   </div>
   <div id="panel" hidden><h2><span id="panel-title"></span><button id="panel-close">X</button></h2><div id="panel-body"></div></div>
   <div id="modal" hidden><div class="card" id="modal-card"></div></div>
-  <div id="name-modal" hidden><div class="card"><h3 id="name-title"></h3><input id="name-input" maxlength="16" autocomplete="off" /><button id="name-go"></button></div></div>
+  <div id="name-modal" hidden><div class="card"><h3 id="name-title"></h3><input id="name-input" maxlength="16" autocomplete="off" /><div id="wallets"></div><p class="note" id="name-hint"></p><p class="note" id="name-or"></p><button id="name-go"></button></div></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

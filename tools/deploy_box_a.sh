@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
 # Runs ON Box A. Expects the client dist already extracted at /var/www/pons.
-# Adds the /pons/ static location and the /pons/ws websocket proxy (to Box C :8130) to the prometheus7.com vhost. Idempotent.
+# Serves the game at /ponsgarden/ (static), proxies /ponsgarden/ws and /ponsgarden/garden/ to Box C :8130,
+# and redirects the old /pons paths. Idempotent: rewrites the whole Pons block each run.
 set -e
 V=/etc/nginx/sites-enabled/hermes
 ls /var/www/pons/index.html >/dev/null
 cp "$V" "/root/hermes_vhost.bak.$(date +%Y%m%d%H%M%S)"
 python3 - "$V" <<'PY'
-import sys
+import re, sys
 p = sys.argv[1]; s = open(p).read()
-static = '''    # Pons Garden (static Phaser build, deployed from Box C /opt/pons/client/dist)
-    location = /pons { return 301 /pons/; }
-    location ^~ /pons/ {
-        alias /var/www/pons/;
-        try_files $uri $uri/ /pons/index.html;
-        add_header Cache-Control "no-cache" always;
+block = '''    # >>> Pons Garden (managed by tools/deploy_box_a.sh)
+    location = /pons { return 301 /ponsgarden/; }
+    location = /ponsgarden { return 301 /ponsgarden/; }
+    location ^~ /pons/garden/ { return 301 /ponsgarden/garden/$request_uri; }
+    location ^~ /pons/ { return 301 /ponsgarden/; }
+    location ^~ /ponsgarden/garden/ {
+        proxy_pass http://89.167.7.54:8130/garden/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
-
-'''
-ws = '''    # Pons Garden game server (websocket) on Box C
-    location = /pons/ws {
+    location = /ponsgarden/ws {
         proxy_pass http://89.167.7.54:8130/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -28,26 +29,21 @@ ws = '''    # Pons Garden game server (websocket) on Box C
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
     }
-'''
-share = '''    # Pons Garden share pages: any wallet is a garden (bible §6.4)
-    location ^~ /pons/garden/ {
-        proxy_pass http://89.167.7.54:8130/garden/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+    location ^~ /ponsgarden/ {
+        alias /var/www/pons/;
+        try_files $uri $uri/ /ponsgarden/index.html;
+        add_header Cache-Control "no-cache" always;
     }
+    # <<< Pons Garden
+
 '''
-changed = False
-if 'location ^~ /pons/garden/' not in s:
-    anchor = "    location = /pons { return 301 /pons/; }"
-    if anchor in s: s = s.replace(anchor, share + anchor, 1); changed = True
-if 'location ^~ /pons/' not in s:
-    anchor = "    location = /sites {"; assert s.count(anchor) == 1
-    s = s.replace(anchor, static + anchor, 1); changed = True
-if 'location = /pons/ws' not in s:
-    anchor = "    location = /pons { return 301 /pons/; }"; assert s.count(anchor) == 1
-    s = s.replace(anchor, ws + anchor, 1); changed = True
-if changed: open(p, "w").write(s)
-print("vhost:", "patched" if changed else "unchanged")
+# strip every earlier Pons location (v1 blocks and the managed block) then insert once before /sites
+s = re.sub(r'    # >>> Pons Garden.*?# <<< Pons Garden\n\n', '', s, flags=re.S)
+s = re.sub(r'    # Pons Garden[^\n]*\n(?:    location[^{]*\{[^}]*\}\n)+\n?', '', s)
+s = re.sub(r'    location = /pons \{ return 301 /pons/; \}\n', '', s)
+anchor = "    location = /sites {"; assert s.count(anchor) == 1, "anchor not unique"
+s = s.replace(anchor, block + anchor, 1)
+open(p, "w").write(s); print("vhost: rewritten")
 PY
 nginx -t 2>&1 | tail -1
 systemctl reload nginx && echo "nginx: reloaded"

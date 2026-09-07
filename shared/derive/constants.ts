@@ -2,15 +2,15 @@
 import type { Tier } from '../types';
 
 export const BIOME_COUNT = 8;
-export const GUEST_PLOTS = 4;
+export const GUEST_PLOTS = 10;   // Ben 2026-09-07: everyone starts with ten empty plots and grows from there
 
-// §2.2 stakeTime (token-days) -> plots
+// §2.2 stakeTime (token-days) -> plots (ladder shifted above the ten-plot start; cap stays 20)
 export const PLOT_LADDER: { min: number; plots: number }[] = [
   { min: 1_000_000, plots: 20 },
-  { min: 100_000, plots: 16 },
-  { min: 10_000, plots: 12 },
-  { min: 1_000, plots: 9 },
-  { min: Number.MIN_VALUE, plots: 6 },
+  { min: 100_000, plots: 18 },
+  { min: 10_000, plots: 16 },
+  { min: 1_000, plots: 14 },
+  { min: Number.MIN_VALUE, plots: 12 },
 ];
 
 // §2.3 holdStreak (days) -> minimum conveyor tier

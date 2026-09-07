@@ -9,6 +9,15 @@ export const CHAIN = {
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
 };
 
+/** The four wallets offered at sign-in. Discovered via EIP-6963 (rdns) with legacy window flags as fallback. */
+export interface WalletDef { id: string; name: string; rdns: string[]; flag: string; url: string; }
+export const WALLETS: WalletDef[] = [
+  { id: 'metamask', name: 'MetaMask', rdns: ['io.metamask'], flag: 'isMetaMask', url: 'https://metamask.io/' },
+  { id: 'phantom', name: 'Phantom', rdns: ['app.phantom'], flag: 'isPhantom', url: 'https://phantom.app/' },
+  { id: 'coinbase', name: 'Coinbase Wallet', rdns: ['com.coinbase.wallet'], flag: 'isCoinbaseWallet', url: 'https://www.coinbase.com/wallet' },
+  { id: 'rabby', name: 'Rabby', rdns: ['io.rabby'], flag: 'isRabby', url: 'https://rabby.io/' },
+];
+
 export const SIGN_STATEMENT = 'Pons Garden: prove you control this wallet to claim its garden. This signature is free and is not a transaction.';
 
 export function signMessage(address: string, nonce: string, issuedAt: string): string {

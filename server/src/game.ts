@@ -19,7 +19,7 @@ const ROSTER = rosterJson.species as import('../../shared/types').Species[];
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
 const MUT = copyJson.mutations as Record<string, string>;
 const UI = copyJson.ui as Record<string, string>;
-const DEFAULT_PLOTS = 4; // guest garden (bible §2.2). Players created before M2 keep the 6 they had.
+const DEFAULT_PLOTS = 10; // Ben 2026-09-07: ten empty plots to start; existing players are raised to this on login (land never shrinks)
 const GRACE_MS = Number(process.env.PONS_GRACE_MS ?? P.GRACE_MS);
 
 export interface PlayerRec {
@@ -193,6 +193,7 @@ export class Game {
     if (off >= 1) { this.addSap(rec, Math.floor(off), 'offline'); }
     rec.lastSeen = now;
     if (rec.visiting && !this.villages.has(rec.visiting)) rec.visiting = null;
+    if (rec.plotCount < DEFAULT_PLOTS) { while (rec.plots.length < DEFAULT_PLOTS) { rec.plots.push(null); rec.lockedUntil.push(0); } rec.plotCount = DEFAULT_PLOTS; this.store.touch(); }
     const spawn = this.spawnFor(rec);
     const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null, lastLot: -1 };
     this.live.set(id, live);
@@ -365,7 +366,15 @@ export class Game {
     if (!n || n.address !== a || now - n.at > 10 * 60_000) return this.send(l.ws, { t: 'toast', text: UI.linkFail });
     if (!verifySignature(signMessage(a, n.value, n.issuedAt), String(signature), a)) return this.send(l.ws, { t: 'toast', text: UI.linkFail });
     const other = [...this.players.values()].find((r) => r.address === a && r.id !== rec.id);
-    if (other) { other.address = null; other.garden = null; this.store.touch(); if (this.live.has(other.id)) { this.pushState(other, { land: this.landView(other) }); this.pushLot(other); } } // the wallet moves to whoever proved it last
+    if (other) {
+      // Wallet sign-in: the wallet already owns a garden, so this device becomes that player.
+      // A fresh device secret is issued for it; the guest record this socket started as is left untouched.
+      if (this.live.has(other.id)) { const o = this.live.get(other.id)!; this.send(o.ws, { t: 'error', text: 'signed in elsewhere' }); o.ws.close(); this.leave(other.id, true); }
+      other.secret = newNonce() + newNonce(); this.store.touch();
+      this.send(l.ws, { t: 'identity', id: other.id, secret: other.secret, name: other.name });
+      this.send(l.ws, { t: 'toast', text: UI.adopted });
+      return;
+    }
     let spec: GardenSpec;
     try { spec = deriveGarden(a, await this.reader.snapshot(a)); } catch (e) { console.error('derive', e); return this.send(l.ws, { t: 'toast', text: UI.linkFail }); }
     if (!this.live.has(rec.id)) return;

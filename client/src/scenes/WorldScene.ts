@@ -5,7 +5,7 @@ import * as P from '@shared/protocol';
 import type { ServerMsg, PrivateState, PublicLot, SnapPlayer, Dir, FeedEvent } from '@shared/protocol';
 import { buildVillage, moveActor, findPath, lotAtPx, lotGatePx, TILE, TILE_STRIDE, T, VILLAGE_W, VILLAGE_H, type Village, type Lot } from '@shared/world';
 import { speciesById, COPY } from '../content';
-import { Net, wsUrl, loadIdentity, newIdentity, type Identity } from '../net';
+import { Net, wsUrl, loadIdentity, newIdentity, saveIdentity, type Identity } from '../net';
 import { hasWallet, connectAddress, signMessageWith } from '../wallet';
 import { BIOME_COUNT } from '@shared/derive/constants';
 import { takeLegacySave } from '../state';
@@ -87,9 +87,12 @@ export class WorldScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onTap(p.worldX, p.worldY));
     this.input.once('pointerdown', () => sfx.unlock());
     this.input.keyboard!.once('keydown', () => sfx.unlock());
+    this.input.keyboard!.on('keydown-Z', () => this.toggleZoom());
     const id = loadIdentity();
-    if (id) this.start(id); else this.hud.askName((name) => this.start(newIdentity(name)));
+    if (id) this.start(id);
+    else this.hud.askName((name, walletId) => { this.start(newIdentity(name)); if (walletId) this.pendingWallet = walletId; });
   }
+  pendingWallet: string | null = null;
 
   start(id: Identity): void {
     this.identity = id;
@@ -155,6 +158,7 @@ export class WorldScene extends Phaser.Scene {
         else if (me) { this.player.setPosition(me.x, me.y); }
         for (const p of m.players) if (p.id !== m.you.id) this.applySnap(p);
         this.ready = true; this.hud.refresh(); this.hud.feedRender();
+        if (this.pendingWallet) { const w = this.pendingWallet; this.pendingWallet = null; void this.connectWallet(w); }
         this.hud.toast(`${COPY.village}: ${this.villageName}. ${COPY.controls}`, 6000);
         break;
       }
@@ -191,6 +195,7 @@ export class WorldScene extends Phaser.Scene {
         else { this.sprintStartedAt = 0; }
         this.hud.banner(Date.now()); break;
       case 'nonce': void this.onNonce(m.address, m.message); break;
+      case 'identity': saveIdentity({ id: m.id, secret: m.secret, name: m.name }); this.net.close(); setTimeout(() => location.reload(), 600); break;
       case 'linked': if (this.you) { this.you.land = m.land; this.you.plotCount = m.plotCount; this.you.rarityFloor = m.rarityFloor; } this.hud.refresh(); if (m.address) this.hud.open('land'); break;
       case 'pong': break;
     }
@@ -345,21 +350,29 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------ wallet (read-only)
-  async connectWallet(): Promise<void> {
+  async connectWallet(walletId: string): Promise<void> {
     if (this.linking) return;
     if (!hasWallet()) { this.hud.toast(COPY.noWallet, 5000); return; }
-    this.linking = true;
+    this.linking = true; this.walletId = walletId;
     try {
-      const address = await connectAddress();
+      const address = await connectAddress(walletId);
       this.pendingAddress = address; this.net.send({ t: 'nonce', address });
     } catch { this.linking = false; this.hud.toast(COPY.noWallet, 4000); }
   }
   pendingAddress: string | null = null;
+  walletId = 'metamask';
   async onNonce(address: string, message: string): Promise<void> {
     if (address !== this.pendingAddress) { this.linking = false; return; }
-    try { this.hud.toast(COPY.signing, 6000); const signature = await signMessageWith(address, message); this.net.send({ t: 'link', address, signature }); }
+    try { this.hud.toast(COPY.signing, 6000); const signature = await signMessageWith(this.walletId, address, message); this.net.send({ t: 'link', address, signature }); }
     catch { this.hud.toast(COPY.linkFail, 4000); }
     finally { this.linking = false; }
+  }
+  /** Map zoom: 1 → 0.5 → 0.25 → 1. The HUD is DOM so it stays crisp. */
+  zoomLevel = 0;
+  toggleZoom(): void {
+    const levels = [1, 0.5, 0.25]; this.zoomLevel = (this.zoomLevel + 1) % levels.length; const z = levels[this.zoomLevel];
+    this.cameras.main.setZoom(z);
+    this.night.setSize(640 / z, 360 / z).setPosition(0, 0);
   }
   unlinkWallet(): void { this.net.send({ t: 'unlink' }); }
 
