@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+// Bible I-4 / I-10 enforcement: scan every user-facing string for banned copy.
+// Sources: content/*.json (all string leaves) and client/src (string literals).
+const fs = require('fs');
+const path = require('path');
+
+const root = path.resolve(__dirname, '..');
+const banned = JSON.parse(fs.readFileSync(path.join(root, 'shared/banned-copy.json'), 'utf8')).patterns
+  .map((p) => new RegExp(p, 'i'));
+
+const hits = [];
+function checkString(s, where) {
+  for (const re of banned) {
+    if (re.test(s)) hits.push({ where, pattern: re.source, text: s.slice(0, 120) });
+  }
+}
+function walkJson(v, where) {
+  if (typeof v === 'string') return checkString(v, where);
+  if (Array.isArray(v)) return v.forEach((x, i) => walkJson(x, `${where}[${i}]`));
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(v)) {
+      if (k === '_doc') continue; // documentation keys describe the rule; they are not user-facing
+      walkJson(v[k], `${where}.${k}`);
+    }
+  }
+}
+function walkDir(dir, exts, fn) {
+  if (!fs.existsSync(dir)) return;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) { if (e.name !== 'node_modules' && e.name !== 'dist') walkDir(p, exts, fn); }
+    else if (exts.includes(path.extname(e.name))) fn(p);
+  }
+}
+
+walkDir(path.join(root, 'content'), ['.json'], (p) => walkJson(JSON.parse(fs.readFileSync(p, 'utf8')), path.relative(root, p)));
+walkDir(path.join(root, 'client/src'), ['.ts', '.html'], (p) => {
+  const src = fs.readFileSync(p, 'utf8');
+  const lits = src.match(/(['"`])(?:(?!\1)[^\\]|\\.)*\1/g) || [];
+  lits.forEach((l) => checkString(l.slice(1, -1), path.relative(root, p)));
+});
+walkDir(path.join(root, 'client'), ['.html'], (p) => checkString(fs.readFileSync(p, 'utf8'), path.relative(root, p)));
+
+if (hits.length) {
+  console.error(`BANNED COPY: ${hits.length} hit(s)`);
+  for (const h of hits) console.error(`  ${h.where}  /${h.pattern}/  "${h.text}"`);
+  process.exit(1);
+}
+console.log('copy lint: clean');

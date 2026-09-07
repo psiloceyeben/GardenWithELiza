@@ -1,0 +1,29 @@
+{
+  "_doc": "Bible §0 I-4 and I-10. Any user-facing string matching one of these (case-insensitive, word-boundary regex) fails CI. Changing this list requires Benjamin + counsel sign-off.",
+  "patterns": [
+    "dividend\\w*",
+    "stock yield\\w*",
+    "distribution\\w*",
+    "returns?\\b.*\\b(on|from) (your|the) (stock|token|broker)",
+    "activate (a|your|the) broker",
+    "broker nft\\w*",
+    "stonkbroker\\w*",
+    "stock tokens?",
+    "buy (a |the )?stock",
+    "sell (a |the )?stock",
+    "referral\\w*",
+    "\\bbet\\b",
+    "\\bbets\\b",
+    "\\bbetting\\b",
+    "jackpot\\w*",
+    "cash ?out",
+    "wager\\w*",
+    "gambl\\w*",
+    "lottery",
+    "withdraw\\w*",
+    "redeem\\w*",
+    "convert (sap|to pons)",
+    "\\bpons\\b.*\\b(earn|reward|payout|pay out)",
+    "(earn|reward|payout|pay out).*\\bpons\\b"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "pons-garden",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["client", "server", "chain-reader", "share"],
+  "scripts": {
+    "lint:copy": "node tools/lint-copy.js",
+    "sprites": "python3 tools/sprites/gen.py client/public/sprites",
+    "build": "npm run lint:copy && npm --workspace client run build",
+    "dev": "npm --workspace client run dev"
+  }
+}
