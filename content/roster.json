@@ -25,6 +25,9 @@
     { "id": "lord_eggplant", "name": "Lord Eggplant Ascendant", "tier": "legendary", "silhouette": "an eggplant floating one pixel above its plot", "idle": "hovers", "flavor": "Has transcended soil. Still needs watering.", "sapBase": 81, "status": "candidate" },
     { "id": "bamboo_inspector", "name": "The Bamboo Inspector", "tier": "legendary", "silhouette": "three bamboo stalks with a clipboard", "idle": "writes something down", "flavor": "Your garden has been noted.", "sapBase": 81, "status": "candidate" },
 
-    { "id": "yelling_tuber", "name": "YELLING TUBER", "tier": "mythic", "silhouette": "potato. It yells. That's it.", "idle": "inhales", "flavor": "AAAAAAAAAAAAAAAAAAAAAAAAA.", "sapBase": 243, "status": "exemplar" }
+    { "id": "yelling_tuber", "name": "YELLING TUBER", "tier": "mythic", "silhouette": "potato. It yells. That's it.", "idle": "inhales", "flavor": "AAAAAAAAAAAAAAAAAAAAAAAAA.", "sapBase": 243, "status": "exemplar" },
+
+    { "id": "melonhound", "name": "The Melonhound", "tier": "rare", "silhouette": "a melon that is also, somehow, a dog", "idle": "pants", "flavor": "Good melon. Good boy. Both.", "sapBase": 9, "status": "candidate", "hybrid": true },
+    { "id": "cactusberry_vicar", "name": "Cactusberry Vicar", "tier": "epic", "silhouette": "a purple cactus with berries and opinions", "idle": "clears throat", "flavor": "Will bless your plot whether you asked or not.", "sapBase": 27, "status": "candidate", "hybrid": true }
   ]
 }

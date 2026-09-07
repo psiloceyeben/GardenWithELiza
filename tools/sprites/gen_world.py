@@ -133,6 +133,23 @@ def build(out):
     for fr in range(3): chars.append((f"gnome{fr}", gnome(fr)))
     for fr in range(2): chars.append((f"npc{fr}", npc(fr)))
     pack(chars, 32, 32, 8, 'chars', out)
-    pk = [(k, plaza(k)) for k in ('fountain0', 'fountain1', 'lamp0', 'lamp1', 'bench', 'board', 'stall', 'sign', 'track', 'pot')]
+    pk = [(k, plaza(k)) for k in ('fountain0', 'fountain1', 'lamp0', 'lamp1', 'bench', 'board', 'stall', 'sign', 'track', 'pot')] + [(f'decor{i}', decor(i)) for i in range(3)]
     pack(pk, 64, 64, 5, 'plaza', out)
     return len(base), len(BIOMES), len(chars), len(pk)
+
+
+def decor(i):
+    """Exotic background flora for stock decor (I-3): pure scenery, original designs."""
+    cv = Canvas(32, 48)
+    if i == 0:  # crystal fern
+        for dx, h in ((-6, 14), (-2, 20), (3, 18), (7, 12)):
+            cv.line(16, 44, 16 + dx, 44 - h, 'c'); cv.line(16 + dx, 44 - h, 16 + dx + (1 if dx > 0 else -1), 44 - h - 3, 'w')
+        cv.ellipse(16, 44, 5, 2, 'T')
+    elif i == 1:  # glow cap
+        cv.rect(14, 30, 4, 14, 'W'); cv.ellipse(16, 29, 9, 5, 'm', top_only=True); cv.rect(7, 29, 19, 2, 'm')
+        for dx, dy in ((-5, -2), (0, -4), (5, -1)): cv.rect(16 + dx, 29 + dy, 2, 2, 'Y')
+    else:  # spiral reed
+        for y in range(44, 14, -1):
+            cv.set(16 + round(4 * math.sin((44 - y) / 3.0)), y, 't'); cv.set(17 + round(4 * math.sin((44 - y) / 3.0)), y, 'T')
+        cv.ellipse(16, 14, 3, 2, 'p'); cv.ellipse(16, 44, 5, 2, 'g')
+    cv.outline(); return cv

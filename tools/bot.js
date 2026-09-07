@@ -94,6 +94,22 @@ class Bot {
   // shop: Bob buys a fence, Alice must break it
   bob.send({ t: 'shop', item: 'fence' }); await sleep(300);
   check(bob.you.defenses.gateMax === 3 || bob.you.sap < P.SHOP_PRICES.fence, `fence purchase (sap=${bob.you.sap})`);
+
+  // wallet link (M2): Alice proves a throwaway key, land derives from the (mock) chain reader
+  const SIG = require('../server/dist/server/src/sig.js');
+  const priv = 'b'.repeat(63) + '1';
+  let nonceMsg = null; const origOn = alice.on.bind(alice);
+  alice.on = (m) => { if (m.t === 'nonce') nonceMsg = m; if (m.t === 'linked') alice.linked = m; origOn(m); };
+  const { address } = SIG.signForTest('probe', priv);
+  alice.send({ t: 'nonce', address }); await sleep(400);
+  check(!!nonceMsg && nonceMsg.address === address, 'server issued a nonce message for the address');
+  const { signature } = SIG.signForTest(nonceMsg.message, priv);
+  alice.send({ t: 'link', address, signature }); await sleep(800);
+  check(!!alice.linked && alice.linked.address === address, 'link accepted with a valid signature');
+  check(alice.linked && alice.linked.plotCount >= 4 && alice.you.land.address === address, `land applied (plots=${alice.linked && alice.linked.plotCount}, floor=${alice.linked && alice.linked.rarityFloor}, tree=${alice.you.land.treeStage}, stumps=${alice.you.land.witherMarks})`);
+  alice.send({ t: 'nonce', address }); await sleep(300);
+  alice.send({ t: 'link', address, signature: '0x' + '11'.repeat(65) }); await sleep(400);
+  check(alice.you.land.address === address, 'bad signature does not change the link');
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS');
   alice.ws.close(); bob.ws.close(); process.exit(fails.length ? 1 : 0);
 })();

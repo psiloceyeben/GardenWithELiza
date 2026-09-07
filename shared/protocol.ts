@@ -22,7 +22,11 @@ export interface PublicLot {
   plotCount: number;
   plots: PublicPlot[];
   defenses: Defenses;
+  land: LandView;
 }
+
+/** Layer C as rendered on a lot: derived, permanent, unstealable. */
+export interface LandView { address: string | null; biome: number; treeStage: number; witherMarks: number; decorFlora: number; hybrids: boolean; }
 
 /** Private state of the connected player (Layer G). */
 export interface PrivateState {
@@ -41,6 +45,7 @@ export interface PrivateState {
   villageId: string;
   stats: { seedsBought: number; reveals: number; steals: number; tags: number; stolenFrom: number };
   lockedUntil: number[];
+  land: LandView;
 }
 
 export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; }
@@ -58,6 +63,9 @@ export type ClientMsg =
   | { t: 'chat'; text: string }
   | { t: 'emote'; e: number }
   | { t: 'rename'; name: string }
+  | { t: 'nonce'; address: string }
+  | { t: 'link'; address: string; signature: string }
+  | { t: 'unlink' }
   | { t: 'ping'; n: number };
 
 export interface FeedEvent { at: number; kind: 'steal' | 'tag' | 'gate' | 'reveal' | 'join' | 'uproot' | 'break'; text: string; }
@@ -76,6 +84,8 @@ export type ServerMsg =
   | { t: 'channel'; kind: 'uproot' | 'break' | null; endsAt: number; startedAt: number }
   | { t: 'carry'; speciesId: string | null }
   | { t: 'error'; text: string }
+  | { t: 'nonce'; address: string; message: string }
+  | { t: 'linked'; address: string | null; land: LandView; plotCount: number; rarityFloor: Tier }
   | { t: 'pong'; n: number; now: number };
 
 // Raid rules (bible §3.2) [TUNABLE]

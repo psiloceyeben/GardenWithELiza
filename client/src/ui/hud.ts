@@ -5,7 +5,7 @@ import * as P from '@shared/protocol';
 import { COPY, TIER_NAME, MUTATION_NAME, MUTATION_FLAVOR, speciesById } from '../content';
 import type { WorldScene } from '../scenes/WorldScene';
 
-type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes';
+type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
@@ -21,7 +21,7 @@ export class Hud {
     }
     $('panel-close').addEventListener('click', () => this.close());
     $('btn-conveyor').textContent = COPY.conveyorShort; $('btn-seeds').textContent = COPY.bag; $('btn-shop').textContent = COPY.shop;
-    $('btn-feed').textContent = COPY.feed.split(' ')[1] ?? COPY.feed; $('btn-emotes').textContent = COPY.emotes; $('btn-odds').textContent = COPY.odds;
+    $('btn-feed').textContent = COPY.feed.split(' ')[1] ?? COPY.feed; $('btn-emotes').textContent = COPY.emotes; $('btn-odds').textContent = COPY.odds; $('btn-land').textContent = COPY.landTitle.split(' ')[1] ?? COPY.landTitle;
     const chat = $<HTMLInputElement>('chat'); chat.placeholder = COPY.chatPlaceholder;
     chat.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { const t = chat.value.trim(); if (t) this.scene.chat(t); chat.value = ''; chat.blur(); } if (e.key === 'Escape') chat.blur(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && document.activeElement !== chat && $('modal').hidden && $('name-modal').hidden) { chat.focus(); e.preventDefault(); } });
@@ -112,6 +112,20 @@ export class Hud {
       title.textContent = COPY.emotes;
       body.innerHTML = `<div class="emotes">${P.EMOTES.map((e, i) => `<button data-emote="${i}">${e}</button>`).join('')}</div>`;
       body.querySelectorAll<HTMLButtonElement>('[data-emote]').forEach((b) => b.addEventListener('click', () => { this.scene.emote(Number(b.dataset.emote)); this.close(); }));
+    } else if (id === 'land') {
+      title.textContent = COPY.landTitle;
+      const land = you.land; const stages = COPY.treeStages.split('|');
+      const addr = land.address ? `${land.address.slice(0, 6)}…${land.address.slice(-4)}` : null;
+      const share = land.address ? `${location.origin}${location.pathname.replace(/[^/]*$/, '')}garden/${land.address}` : null;
+      body.innerHTML = (addr ? `<div class="row"><span>${COPY.connected}</span><span>${addr}</span></div>` : `<div class="note">${COPY.landGuest}</div>`)
+        + `<div class="row"><span>${COPY.landPlots}</span><span>${you.plotCount}</span></div>`
+        + `<div class="row"><span>${COPY.landFloor}</span><span class="t-${you.rarityFloor}">${TIER_NAME[you.rarityFloor]}</span></div>`
+        + (addr ? `<div class="row"><span>${COPY.landTree}</span><span>${stages[land.treeStage]}</span></div><div class="row"><span>${COPY.landStumps}</span><span>${land.witherMarks}</span></div><div class="row"><span>${COPY.landHybrids}</span><span>${land.hybrids ? '✓' : '—'}</span></div>` : '')
+        + `<div class="note">${COPY.connectHint}</div><div class="buy" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">`
+        + (addr ? `<button id="btn-share">${COPY.share}</button><button id="btn-unlink">${COPY.disconnect}</button>` : `<button id="btn-connect">${COPY.connect}</button>`) + `</div>`;
+      body.querySelector('#btn-connect')?.addEventListener('click', () => void this.scene.connectWallet());
+      body.querySelector('#btn-unlink')?.addEventListener('click', () => this.scene.unlinkWallet());
+      body.querySelector('#btn-share')?.addEventListener('click', () => { if (share) { navigator.clipboard?.writeText(share).catch(() => undefined); this.toast(`${COPY.shareCopied}: ${share}`, 5000); } });
     } else {
       title.textContent = COPY.oddsTitle;
       body.innerHTML = `<div class="note">${COPY.oddsTiers}</div>${E.TIERS.map((t) => `<div class="row"><span class="t-${t}">${TIER_NAME[t]}</span><span>${(E.TIER_ODDS[t] * 100).toFixed(1)}%</span></div>`).join('')}

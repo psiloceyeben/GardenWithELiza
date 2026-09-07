@@ -29,7 +29,17 @@ ws = '''    # Pons Garden game server (websocket) on Box C
         proxy_send_timeout 3600s;
     }
 '''
+share = '''    # Pons Garden share pages: any wallet is a garden (bible §6.4)
+    location ^~ /pons/garden/ {
+        proxy_pass http://89.167.7.54:8130/garden/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+'''
 changed = False
+if 'location ^~ /pons/garden/' not in s:
+    anchor = "    location = /pons { return 301 /pons/; }"
+    if anchor in s: s = s.replace(anchor, share + anchor, 1); changed = True
 if 'location ^~ /pons/' not in s:
     anchor = "    location = /sites {"; assert s.count(anchor) == 1
     s = s.replace(anchor, static + anchor, 1); changed = True

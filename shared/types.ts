@@ -11,6 +11,7 @@ export interface Species {
   flavor: string;
   sapBase: number;
   status: 'exemplar' | 'candidate';
+  hybrid?: boolean;   // only offered when the wallet unlocks hybrids (bible §2.5); standard yields
 }
 
 export interface Seed { uid: string; speciesId: string; tier: Tier; }

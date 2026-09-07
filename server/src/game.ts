@@ -7,13 +7,18 @@ import { buildVillage, lotAtPx, lotGatePx, moveActor, TILE, BIOME_NAMES, LOTS_PE
 import * as P from '../../shared/protocol';
 import type { ClientMsg, ServerMsg, PrivateState, PublicLot, SnapPlayer, Defenses, FeedEvent, Dir } from '../../shared/protocol';
 import { Store } from './store';
+import { deriveGarden, type GardenSpec } from '../../shared/derive';
+import { readerFromEnv, type ChainReader } from '../../chain-reader/src';
+import { verifySignature, newNonce } from './sig';
+import { signMessage } from '../../shared/chain';
 import rosterJson from '../../content/roster.json';
 import copyJson from '../../content/copy.json';
 
 const ROSTER = rosterJson.species as import('../../shared/types').Species[];
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
 const MUT = copyJson.mutations as Record<string, string>;
-const DEFAULT_PLOTS = 6;
+const UI = copyJson.ui as Record<string, string>;
+const DEFAULT_PLOTS = 4; // guest garden (bible §2.2). Players created before M2 keep the 6 they had.
 const GRACE_MS = Number(process.env.PONS_GRACE_MS ?? P.GRACE_MS);
 
 export interface PlayerRec {
@@ -25,6 +30,8 @@ export interface PlayerRec {
   createdAt: number; lastSeen: number;
   stats: PrivateState['stats'];
   stolenLog: number[];
+  address?: string | null;      // linked wallet (proved by signature); null/undefined = guest
+  garden?: GardenSpec | null;   // Layer C, derived; re-derived on every link
 }
 export interface VillageRec { id: string; seed: number; lots: (string | null)[]; n: number; }
 
@@ -33,6 +40,7 @@ interface Live {
   carry: { plant: Plant; from: string; fromPlot: number } | null;
   channel: { kind: 'uproot' | 'break'; target: string; plotId: number; startedAt: number; endsAt: number; sx: number; sy: number } | null;
   shieldUntil: number; lastInputAt: number; lastChatAt: number; connectedAt: number;
+  nonce: { value: string; address: string; issuedAt: string; at: number } | null;
 }
 
 export class Game {
@@ -44,6 +52,7 @@ export class Game {
   feeds = new Map<string, FeedEvent[]>();
   rng = mulberry32(randomSeed());
   nextVillage = 1;
+  reader: ChainReader = readerFromEnv(process.env);
 
   constructor(dataDir: string) {
     this.store = new Store(dataDir, this.players, this.villages);
@@ -93,11 +102,15 @@ export class Game {
     return { x: c.x + Math.cos(a) * 52, y: c.y + Math.sin(a) * 40 };
   }
 
+  landView(rec: PlayerRec): P.LandView {
+    const g = rec.garden ?? null;
+    return { address: rec.address ?? null, biome: g ? g.biome : this.map(rec).biome, treeStage: g ? g.treeStage : 0, witherMarks: g ? g.witherMarks : 0, decorFlora: g ? g.decorFlora : 0, hybrids: g ? g.hybridsUnlocked : false };
+  }
   privateState(rec: PlayerRec): PrivateState {
-    return { id: rec.id, name: rec.name, color: rec.color, sap: rec.sap, seeds: rec.seeds, plots: rec.plots, plotCount: rec.plotCount, conveyor: rec.conveyor, speedLevel: rec.speedLevel, rarityFloor: rec.rarityFloor, defenses: rec.defenses, lotId: rec.lotId, villageId: rec.villageId, stats: rec.stats, lockedUntil: rec.lockedUntil };
+    return { id: rec.id, name: rec.name, color: rec.color, sap: rec.sap, seeds: rec.seeds, plots: rec.plots, plotCount: rec.plotCount, conveyor: rec.conveyor, speedLevel: rec.speedLevel, rarityFloor: rec.rarityFloor, defenses: rec.defenses, lotId: rec.lotId, villageId: rec.villageId, stats: rec.stats, lockedUntil: rec.lockedUntil, land: this.landView(rec) };
   }
   publicLot(rec: PlayerRec, now: number): PublicLot {
-    return { lotId: rec.lotId, ownerId: rec.id, name: rec.name, color: rec.color, online: this.live.has(rec.id), shielded: this.isShielded(rec, now), plotCount: rec.plotCount, defenses: rec.defenses,
+    return { lotId: rec.lotId, ownerId: rec.id, name: rec.name, color: rec.color, online: this.live.has(rec.id), shielded: this.isShielded(rec, now), plotCount: rec.plotCount, defenses: rec.defenses, land: this.landView(rec),
       plots: rec.plots.map((p, i) => p ? ({ i, speciesId: p.speciesId, tier: p.tier, revealed: p.revealed, size: p.size, mutation: p.mutation, lockedUntil: rec.lockedUntil[i] ?? 0 }) : null).filter((x): x is P.PublicPlot => !!x) };
   }
   pushLot(rec: PlayerRec): void { this.broadcast(rec.villageId, { t: 'lot', lot: this.publicLot(rec, Date.now()) }); }
@@ -137,7 +150,7 @@ export class Game {
     rec.lastSeen = now;
     const village = this.villages.get(rec.villageId)!; const map = this.map(rec); const gate = lotGatePx(this.lot(rec)); const l = this.lot(rec);
     const spawn = { x: gate.x + (l.gateSide === 'left' ? -TILE : l.gateSide === 'right' ? TILE : 0), y: gate.y + (l.gateSide === 'top' ? -TILE : l.gateSide === 'bottom' ? TILE : 0) };
-    const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now };
+    const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null };
     this.live.set(id, live);
     const lots = village.lots.map((o) => o ? this.players.get(o) : null).filter((r): r is PlayerRec => !!r).map((r) => this.publicLot(r, now));
     this.send(ws, { t: 'welcome', you: this.privateState(rec), village: { id: village.id, seed: village.seed, biome: map.biome, name: `${BIOME_NAMES[map.biome]} #${village.n}` }, lots, players: this.snapOf(rec.villageId, now), names: this.names(rec.villageId), feed: this.feeds.get(rec.villageId) ?? [], now });
@@ -163,6 +176,7 @@ export class Game {
       speedLevel: 0, rarityFloor: 'common', defenses: { gateMax: 0, gateHp: 0, gnome: false, sprinkler: false },
       villageId: village.id, lotId, createdAt: now, lastSeen: now,
       stats: { seedsBought: 0, reveals: 0, steals: 0, tags: 0, stolenFrom: 0 }, stolenLog: [],
+      address: null, garden: null,
     };
     // migrate the M1 local save once
     if (save && typeof save.sap === 'number') {
@@ -187,9 +201,12 @@ export class Game {
   }
 
   // ------------------------------------------------------------ messages
-  handle(l: Live, m: ClientMsg): void {
+  handle(l: Live, m: ClientMsg): void | Promise<void> {
     const rec = this.players.get(l.id)!; const now = Date.now();
     switch (m.t) {
+      case 'nonce': return this.onNonce(l, m.address, now);
+      case 'link': return this.onLink(l, rec, m.address, m.signature, now);
+      case 'unlink': rec.address = null; rec.garden = null; rec.rarityFloor = 'common'; this.store.touch(); this.pushState(rec, { rarityFloor: 'common', land: this.landView(rec) }); this.send(l.ws, { t: 'linked', address: null, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor }); this.pushLot(rec); return;
       case 'input': return this.onInput(l, rec, m, now);
       case 'buy': return this.onBuy(l, rec, m.slot);
       case 'plant': return this.onPlant(l, rec, m.seedUid, m.plotId, now);
@@ -203,6 +220,39 @@ export class Game {
       case 'rename': { const n = cleanName(m.name); if (n) { rec.name = n; this.store.touch(); this.pushState(rec, { name: n }); this.broadcast(rec.villageId, { t: 'players', names: { [rec.id]: { name: n, color: rec.color } } }); this.pushLot(rec); } return; }
       case 'ping': this.send(l.ws, { t: 'pong', n: m.n, now }); return;
     }
+  }
+
+  // ------------------------------------------------------------ wallet link (read-only; a free signature proves control — I-1/I-2)
+  onNonce(l: Live, address: string, now: number): void {
+    const a = String(address).toLowerCase(); if (!/^0x[0-9a-f]{40}$/.test(a)) return;
+    l.nonce = { value: newNonce(), address: a, issuedAt: new Date(now).toISOString(), at: now };
+    this.send(l.ws, { t: 'nonce', address: a, message: signMessage(a, l.nonce.value, l.nonce.issuedAt) });
+  }
+
+  async onLink(l: Live, rec: PlayerRec, address: string, signature: string, now: number): Promise<void> {
+    const a = String(address).toLowerCase(); const n = l.nonce; l.nonce = null;
+    if (!n || n.address !== a || now - n.at > 10 * 60_000) return this.send(l.ws, { t: 'toast', text: UI.linkFail });
+    if (!verifySignature(signMessage(a, n.value, n.issuedAt), String(signature), a)) return this.send(l.ws, { t: 'toast', text: UI.linkFail });
+    const other = [...this.players.values()].find((r) => r.address === a && r.id !== rec.id);
+    if (other) { other.address = null; other.garden = null; this.store.touch(); if (this.live.has(other.id)) { this.pushState(other, { land: this.landView(other) }); this.pushLot(other); } } // the wallet moves to whoever proved it last
+    let spec: GardenSpec;
+    try { spec = deriveGarden(a, await this.reader.snapshot(a)); } catch (e) { console.error('derive', e); return this.send(l.ws, { t: 'toast', text: UI.linkFail }); }
+    if (!this.live.has(rec.id)) return;
+    this.applyGarden(rec, spec, now);
+    this.send(l.ws, { t: 'linked', address: a, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor });
+    this.send(l.ws, { t: 'toast', text: UI.linkOk });
+    this.feed(rec.villageId, 'join', `${rec.name} claimed their land (${rec.plotCount} plots)`);
+  }
+
+  applyGarden(rec: PlayerRec, spec: GardenSpec, now: number): void {
+    rec.address = spec.address; rec.garden = spec;
+    const count = Math.max(rec.plotCount, spec.plotCount); // land never shrinks under planted crops
+    while (rec.plots.length < count) { rec.plots.push(null); rec.lockedUntil.push(0); }
+    rec.plotCount = count; rec.rarityFloor = spec.rarityFloor;
+    rec.conveyor = { slots: E.rollConveyor(this.rng, ROSTER, rec.rarityFloor, rec.plotCount, spec.hybridsUnlocked), refreshAt: now + E.CONVEYOR_REFRESH_MS };
+    this.store.touch();
+    this.pushState(rec, { plots: rec.plots, plotCount: rec.plotCount, lockedUntil: rec.lockedUntil, rarityFloor: rec.rarityFloor, conveyor: rec.conveyor, land: this.landView(rec) });
+    this.pushLot(rec);
   }
 
   onInput(l: Live, rec: PlayerRec, m: Extract<ClientMsg, { t: 'input' }>, now: number): void {
@@ -389,7 +439,7 @@ export class Game {
         if (p.revealed) sps += E.sapPerSec(p, SP.get(p.speciesId)!);
       }
       if (sps > 0) this.addSap(rec, sps, 'tick');
-      if (now >= rec.conveyor.refreshAt) { rec.conveyor = { slots: E.rollConveyor(this.rng, ROSTER, rec.rarityFloor, rec.plotCount), refreshAt: now + E.CONVEYOR_REFRESH_MS }; changed = true; this.send(l.ws, { t: 'toast', text: `${copyJson.ui.conveyor}: ${copyJson.ui.newSeeds}` }); }
+      if (now >= rec.conveyor.refreshAt) { rec.conveyor = { slots: E.rollConveyor(this.rng, ROSTER, rec.rarityFloor, rec.plotCount, rec.garden?.hybridsUnlocked ?? false), refreshAt: now + E.CONVEYOR_REFRESH_MS }; changed = true; this.send(l.ws, { t: 'toast', text: `${copyJson.ui.conveyor}: ${copyJson.ui.newSeeds}` }); }
       this.pushState(rec, changed ? { sap: rec.sap, plots: rec.plots, conveyor: rec.conveyor, stats: rec.stats } : { sap: rec.sap });
       if (changed) this.pushLot(rec);
       // shield expiry flips the public lot flag

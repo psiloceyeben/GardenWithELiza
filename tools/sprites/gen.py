@@ -412,6 +412,8 @@ VIS = {
     'lord_eggplant':     dict(kind='eggplant',  body='P', body2='m', gag='none',      mouth='smile'),
     'bamboo_inspector':  dict(kind='bamboo',    body='G', body2='g', gag='clipboard', mouth='flat'),
     'yelling_tuber':     dict(kind='potato',    body='b', body2='B', gag='yell',      mouth='yell'),
+    'melonhound':        dict(kind='melon',     body='o', body2='r', gag='sweat',     mouth='smile'),
+    'cactusberry_vicar': dict(kind='cactus',    body='P', body2='v', gag='crown',     mouth='flat'),
 }
 
 

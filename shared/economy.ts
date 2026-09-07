@@ -67,11 +67,12 @@ export function rollTier(rng: () => number, floor: Tier): Tier {
   return tierIndex(t) < tierIndex(floor) ? floor : t;
 }
 
-export function rollConveyor(rng: () => number, roster: Species[], floor: Tier, plotCount: number): ConveyorSlot[] {
+export function rollConveyor(rng: () => number, roster: Species[], floor: Tier, plotCount: number, hybrids = false): ConveyorSlot[] {
   const slots: ConveyorSlot[] = [];
   for (let i = 0; i < CONVEYOR_SLOTS; i++) {
     const tier = rollTier(rng, floor);
-    const pool = roster.filter((s) => s.tier === tier);
+    let pool = roster.filter((s) => s.tier === tier && (!s.hybrid || hybrids));
+    if (!pool.length) pool = roster.filter((s) => s.tier === tier);
     const sp = pool[Math.floor(rng() * pool.length)];
     slots.push({ speciesId: sp.id, tier, price: seedPrice(tier, plotCount), sold: false });
   }

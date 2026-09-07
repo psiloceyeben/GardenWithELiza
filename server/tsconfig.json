@@ -12,5 +12,5 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["src", "../shared/**/*.ts", "../content/*.json"]
+  "include": ["src", "../shared/**/*.ts", "../content/*.json", "../chain-reader/src/**/*.ts", "../share/**/*.ts"]
 }

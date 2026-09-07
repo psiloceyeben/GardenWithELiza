@@ -6,6 +6,8 @@ import type { ServerMsg, PrivateState, PublicLot, SnapPlayer, Dir, FeedEvent } f
 import { buildVillage, moveActor, findPath, lotAtPx, lotGatePx, TILE, T, VILLAGE_W, VILLAGE_H, type Village, type Lot } from '@shared/world';
 import { speciesById, COPY } from '../content';
 import { Net, wsUrl, loadIdentity, newIdentity, type Identity } from '../net';
+import { hasWallet, connectAddress, signMessageWith } from '../wallet';
+import { BIOME_COUNT } from '@shared/derive/constants';
 import { takeLegacySave } from '../state';
 import { Hud } from '../ui/hud';
 import { sfx } from '../audio';
@@ -21,6 +23,8 @@ interface LotView {
   locks: Map<number, Phaser.GameObjects.Image>;
   gnome: Phaser.GameObjects.Sprite | null;
   sprinkler: Phaser.GameObjects.Sprite | null;
+  landKey: string;
+  landObjs: Phaser.GameObjects.GameObject[];
 }
 interface Remote { sprite: Phaser.GameObjects.Sprite; tag: Phaser.GameObjects.Text; tx: number; ty: number; d: Dir; f: boolean; m: boolean; carry: Phaser.GameObjects.Image | null; carryId: string; bubble: Phaser.GameObjects.Text | null; bubbleUntil: number; color: number; }
 
@@ -56,6 +60,8 @@ export class WorldScene extends Phaser.Scene {
   lockMode = false;
   dir: Dir = 'down'; flip = false; moving = false;
   lastSend = 0; hue = 0; ready = false;
+  villageBiome = 0;
+  linking = false;
 
   constructor() { super('world'); }
 
@@ -89,9 +95,13 @@ export class WorldScene extends Phaser.Scene {
     const v = buildVillage(seed); this.village = v;
     const rows: number[][] = [];
     for (let y = 0; y < VILLAGE_H; y++) { const r: number[] = []; for (let x = 0; x < VILLAGE_W; x++) r.push(v.grid[y * VILLAGE_W + x]); rows.push(r); }
+    // every biome tileset lives in one layer (gid = biome*16 + tile) so each lot can wear its wallet's biome
+    for (const r of rows) for (let i = 0; i < r.length; i++) r[i] += biome * 16;
     const map = this.make.tilemap({ data: rows, tileWidth: TILE, tileHeight: TILE });
-    const ts = map.addTilesetImage(`tiles_b${biome}`, `tiles_b${biome}`, TILE, TILE, 0, 0)!;
-    this.layer = map.createLayer(0, ts, 0, 0)!.setDepth(0);
+    const sets: Phaser.Tilemaps.Tileset[] = [];
+    for (let b = 0; b < BIOME_COUNT; b++) sets.push(map.addTilesetImage(`tiles_b${b}`, `tiles_b${b}`, TILE, TILE, 0, 0, b * 16)!);
+    this.layer = map.createLayer(0, sets, 0, 0)!.setDepth(0);
+    this.villageBiome = biome;
     for (const p of v.props) {
       const px = p.tx * TILE + (p.w * TILE) / 2; const py = (p.ty + p.h) * TILE;
       if (p.kind.startsWith('tree')) this.add.image(px, py + 2, 'props', p.kind).setOrigin(0.5, 1).setDepth(py);
@@ -151,6 +161,8 @@ export class WorldScene extends Phaser.Scene {
       case 'channel': this.channel = m.kind ? { kind: m.kind, start: Date.now(), dur: m.endsAt - m.startedAt } : null; if (m.kind) sfx.plant(); break;
       case 'carry': this.carrying = m.speciesId; this.setCarry(this.player, this.myCarry, m.speciesId, (i) => { this.myCarry = i; }); if (m.speciesId) { sfx.scream(); this.hud.toast(COPY.runHome, 3000); } this.hud.refresh(); break;
       case 'error': this.hud.toast(m.text, 5000); break;
+      case 'nonce': void this.onNonce(m.address, m.message); break;
+      case 'linked': if (this.you) { this.you.land = m.land; this.you.plotCount = m.plotCount; this.you.rarityFloor = m.rarityFloor; } this.hud.refresh(); if (m.address) this.hud.open('land'); break;
       case 'pong': break;
     }
   }
@@ -189,15 +201,15 @@ export class WorldScene extends Phaser.Scene {
     if (!view) {
       const g = lotGatePx(geo);
       const sign = this.add.text(g.x, g.y - (geo.gateSide === 'top' ? 20 : geo.gateSide === 'bottom' ? -26 : 22), '', { fontFamily: '"Press Start 2P", monospace', fontSize: '6px', color: '#fff', stroke: '#000', strokeThickness: 2, resolution: 3, align: 'center' }).setOrigin(0.5, 1).setDepth(7000);
-      view = { lot: l, geo, sign, plants: new Map(), fx: new Map(), locks: new Map(), gnome: null, sprinkler: null };
+      view = { lot: l, geo, sign, plants: new Map(), fx: new Map(), locks: new Map(), gnome: null, sprinkler: null, landKey: '', landObjs: [] };
       this.lots.set(l.ownerId, view);
-      for (let i = 0; i < l.plotCount; i++) this.layer.putTileAt(T.plot, geo.plots[i].tx, geo.plots[i].ty);
     }
     view.lot = l;
+    this.applyLand(view);
     const mine = l.ownerId === this.you?.id;
     const status = l.shielded ? ` (${COPY.shielded})` : l.online ? '' : ` (${COPY.offline})`;
     view.sign.setText(`${mine ? COPY.yourLot : l.name}${status}`).setColor(mine ? '#f0c434' : l.shielded ? '#8fc3ff' : '#fff');
-    this.layer.putTileAt(l.defenses.gateHp > 0 ? T.gate_closed : T.gate_open, geo.gate.tx, geo.gate.ty);
+    this.layer.putTileAt(this.villageBiome * 16 + (l.defenses.gateHp > 0 ? T.gate_closed : T.gate_open), geo.gate.tx, geo.gate.ty);
     // plants
     const present = new Set<number>();
     for (const p of l.plots) {
@@ -225,6 +237,51 @@ export class WorldScene extends Phaser.Scene {
   }
 
   clearFx(view: LotView, i: number): void { for (const o of view.fx.get(i) ?? []) o.destroy(); view.fx.delete(i); }
+
+  /** Layer C on the map: lot interior in the wallet's biome, plot tiles, conviction tree, wither stumps, decor flora. */
+  applyLand(view: LotView): void {
+    const l = view.lot; const geo = view.geo; const land = l.land;
+    const key = `${land.address}:${land.biome}:${land.treeStage}:${land.witherMarks}:${land.decorFlora}:${l.plotCount}`;
+    if (view.landKey === key) return;
+    view.landKey = key;
+    for (const o of view.landObjs) o.destroy(); view.landObjs = [];
+    const b = land.address ? land.biome : this.villageBiome;
+    for (let j = 1; j < geo.h - 1; j++) for (let i = 1; i < geo.w - 1; i++) this.layer.putTileAt(b * 16 + T.grass2, geo.x + i, geo.y + j);
+    for (let i = 0; i < l.plotCount; i++) this.layer.putTileAt(b * 16 + T.plot, geo.plots[i].tx, geo.plots[i].ty);
+    if (land.address) {
+      const tx = geo.gateSide === 'left' ? geo.x + geo.w - 2 : geo.x + 1; const ty = geo.gateSide === 'top' ? geo.y + geo.h - 2 : geo.y + 1;
+      const t = this.add.image(tx * TILE + 16, ty * TILE + 30, 'props', `tree${land.treeStage}`).setOrigin(0.5, 1).setDepth(ty * TILE + 30);
+      view.landObjs.push(t);
+    }
+    for (let k = 0; k < land.witherMarks; k++) {
+      const outside = geo.gateSide === 'bottom' ? { tx: geo.x + 1 + k * 2, ty: geo.y - 1 } : geo.gateSide === 'top' ? { tx: geo.x + 1 + k * 2, ty: geo.y + geo.h } : geo.gateSide === 'left' ? { tx: geo.x + geo.w, ty: geo.y + 1 + k * 2 } : { tx: geo.x - 1, ty: geo.y + 1 + k * 2 };
+      view.landObjs.push(this.add.image(outside.tx * TILE + 16, outside.ty * TILE + 30, 'props', 'stump').setOrigin(0.5, 1).setDepth(outside.ty * TILE + 30));
+    }
+    for (let k = 0; k < land.decorFlora; k++) {
+      const side = geo.gateSide === 'left' || geo.gateSide === 'right';
+      const tx = side ? geo.x + 1 + k * 2 : geo.x + geo.w; const ty = side ? geo.y + geo.h : geo.y + 1 + k;
+      view.landObjs.push(this.add.image(tx * TILE + 16 + (side ? 0 : 6), ty * TILE + 30, 'plaza', `decor${k % 3}`).setOrigin(0.5, 1).setDepth(ty * TILE + 30));
+    }
+  }
+
+  // ------------------------------------------------------------ wallet (read-only)
+  async connectWallet(): Promise<void> {
+    if (this.linking) return;
+    if (!hasWallet()) { this.hud.toast(COPY.noWallet, 5000); return; }
+    this.linking = true;
+    try {
+      const address = await connectAddress();
+      this.pendingAddress = address; this.net.send({ t: 'nonce', address });
+    } catch { this.linking = false; this.hud.toast(COPY.noWallet, 4000); }
+  }
+  pendingAddress: string | null = null;
+  async onNonce(address: string, message: string): Promise<void> {
+    if (address !== this.pendingAddress) { this.linking = false; return; }
+    try { this.hud.toast(COPY.signing, 6000); const signature = await signMessageWith(address, message); this.net.send({ t: 'link', address, signature }); }
+    catch { this.hud.toast(COPY.linkFail, 4000); }
+    finally { this.linking = false; }
+  }
+  unlinkWallet(): void { this.net.send({ t: 'unlink' }); }
 
   applyMutation(view: LotView, i: number, s: Phaser.GameObjects.Sprite, mutation: string, pos: { x: number; y: number }): void {
     const fx: Phaser.GameObjects.GameObject[] = [];
