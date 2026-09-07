@@ -47,9 +47,13 @@ export const seedPrice = (tier: Tier, plotCount: number): number =>
   Math.round(SEED_PRICE[tier] * (1 + 0.15 * Math.max(0, plotCount - 6)));
 export const mutationMult = (m: MutationId): number => MUTATIONS.find((x) => x.id === m)?.mult ?? 1;
 
-export function sapPerSec(p: Plant, sp: Species): number {
+export const WEEDY_AFTER_MS = 20 * 60_000;   // untended this long -> weeds halve output until tended
+export const WEEDY_FACTOR = 0.5;
+export const isWeedy = (p: Plant, now: number): boolean => p.revealed && now - p.lastWeeded > WEEDY_AFTER_MS;
+
+export function sapPerSec(p: Plant, sp: Species, now = Date.now()): number {
   if (!p.revealed) return 0;
-  return sp.sapBase * p.size * mutationMult(p.mutation);
+  return sp.sapBase * p.size * mutationMult(p.mutation) * (isWeedy(p, now) ? WEEDY_FACTOR : 1);
 }
 
 export function weightedPick<T>(rng: () => number, items: T[], weight: (t: T) => number): T {

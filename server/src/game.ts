@@ -11,6 +11,7 @@ import { deriveGarden, type GardenSpec } from '../../shared/derive';
 import { readerFromEnv, type ChainReader } from '../../chain-reader/src';
 import { verifySignature, newNonce } from './sig';
 import { signMessage } from '../../shared/chain';
+import { Life } from './life';
 import rosterJson from '../../content/roster.json';
 import copyJson from '../../content/copy.json';
 
@@ -33,7 +34,7 @@ export interface PlayerRec {
   address?: string | null;      // linked wallet (proved by signature); null/undefined = guest
   garden?: GardenSpec | null;   // Layer C, derived; re-derived on every link
 }
-export interface VillageRec { id: string; seed: number; lots: (string | null)[]; n: number; }
+export interface VillageRec { id: string; seed: number; lots: (string | null)[]; n: number; sprint?: P.SprintEntry[]; }
 
 interface Live {
   id: string; ws: WebSocket; x: number; y: number; d: Dir; f: boolean; m: boolean;
@@ -53,6 +54,7 @@ export class Game {
   rng = mulberry32(randomSeed());
   nextVillage = 1;
   reader: ChainReader = readerFromEnv(process.env);
+  life = new Life(this);
 
   constructor(dataDir: string) {
     this.store = new Store(dataDir, this.players, this.villages);
@@ -111,7 +113,7 @@ export class Game {
   }
   publicLot(rec: PlayerRec, now: number): PublicLot {
     return { lotId: rec.lotId, ownerId: rec.id, name: rec.name, color: rec.color, online: this.live.has(rec.id), shielded: this.isShielded(rec, now), plotCount: rec.plotCount, defenses: rec.defenses, land: this.landView(rec),
-      plots: rec.plots.map((p, i) => p ? ({ i, speciesId: p.speciesId, tier: p.tier, revealed: p.revealed, size: p.size, mutation: p.mutation, lockedUntil: rec.lockedUntil[i] ?? 0 }) : null).filter((x): x is P.PublicPlot => !!x) };
+      plots: rec.plots.map((p, i) => p ? ({ i, speciesId: p.speciesId, tier: p.tier, revealed: p.revealed, size: p.size, mutation: p.mutation, lockedUntil: rec.lockedUntil[i] ?? 0, weedy: E.isWeedy(p, now) }) : null).filter((x): x is P.PublicPlot => !!x) };
   }
   pushLot(rec: PlayerRec): void { this.broadcast(rec.villageId, { t: 'lot', lot: this.publicLot(rec, Date.now()) }); }
   pushState(rec: PlayerRec, part: Partial<PrivateState>): void { this.sendTo(rec.id, { t: 'state', you: part }); }
@@ -154,6 +156,7 @@ export class Game {
     this.live.set(id, live);
     const lots = village.lots.map((o) => o ? this.players.get(o) : null).filter((r): r is PlayerRec => !!r).map((r) => this.publicLot(r, now));
     this.send(ws, { t: 'welcome', you: this.privateState(rec), village: { id: village.id, seed: village.seed, biome: map.biome, name: `${BIOME_NAMES[map.biome]} #${village.n}` }, lots, players: this.snapOf(rec.villageId, now), names: this.names(rec.villageId), feed: this.feeds.get(rec.villageId) ?? [], now });
+    for (const extra of this.life.welcome(rec.villageId)) this.send(ws, extra);
     if (off >= 1) this.send(ws, { t: 'toast', text: `${copyJson.ui.offlineBack} ${Math.floor(off)} ${copyJson.ui.sap}.` });
     this.broadcast(rec.villageId, { t: 'players', names: { [id]: { name: rec.name, color: rec.color } } }, id);
     this.pushLot(rec);
@@ -204,6 +207,8 @@ export class Game {
   handle(l: Live, m: ClientMsg): void | Promise<void> {
     const rec = this.players.get(l.id)!; const now = Date.now();
     switch (m.t) {
+      case 'forage': return this.life.forage(l, rec, String(m.id));
+      case 'sprint': return this.life.sprintStart(l, rec, now);
       case 'nonce': return this.onNonce(l, m.address, now);
       case 'link': return this.onLink(l, rec, m.address, m.signature, now);
       case 'unlink': rec.address = null; rec.garden = null; rec.rarityFloor = 'common'; this.store.touch(); this.pushState(rec, { rarityFloor: 'common', land: this.landView(rec) }); this.send(l.ws, { t: 'linked', address: null, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor }); this.pushLot(rec); return;
@@ -295,8 +300,10 @@ export class Game {
       this.send(l.ws, { t: 'toast', text: `${copyJson.ui.watered}.` });
     } else {
       if (now - p.lastWeeded < E.WEED_COOLDOWN_MS) return this.send(l.ws, { t: 'toast', text: `${SP.get(p.speciesId)!.name}: ${Math.round(E.sapPerSec(p, SP.get(p.speciesId)!) * 100) / 100} ${copyJson.ui.sapPerSec}` });
-      const bonus = Math.floor(E.sapPerSec(p, SP.get(p.speciesId)!) * E.WEED_BONUS_SEC); p.lastWeeded = now; this.addSap(rec, bonus, 'weed');
-      this.send(l.ws, { t: 'toast', text: `${copyJson.ui.weeded}! +${bonus} ${copyJson.ui.sap}` });
+      const wasWeedy = E.isWeedy(p, now); p.lastWeeded = now;
+      const bonus = Math.floor(E.sapPerSec(p, SP.get(p.speciesId)!, now) * E.WEED_BONUS_SEC); this.addSap(rec, bonus, 'weed');
+      this.send(l.ws, { t: 'toast', text: `${wasWeedy ? UI.weedsPulled : copyJson.ui.weeded}! +${bonus} ${copyJson.ui.sap}` });
+      if (wasWeedy) this.pushLot(rec);
     }
     this.store.touch(); this.pushState(rec, { sap: rec.sap, plots: rec.plots });
   }
@@ -403,6 +410,7 @@ export class Game {
 
   // ------------------------------------------------------------ ticks
   tick(now: number): void {
+    this.life.tick(now);
     for (const l of this.live.values()) {
       const rec = this.players.get(l.id)!;
       if (l.channel) {
@@ -427,12 +435,13 @@ export class Game {
   }
 
   economy(now: number): void {
+    this.life.second(now);
     for (const l of this.live.values()) {
       const rec = this.players.get(l.id)!; let sps = 0; let changed = false;
       for (let i = 0; i < rec.plots.length; i++) {
         const p = rec.plots[i]; if (!p) continue;
         if (!p.revealed && now >= p.plantedAt + p.growMs) {
-          const r = E.rollReveal(this.rng); p.revealed = true; p.size = r.size; p.mutation = r.mutation; p.lastWeeded = now; rec.stats.reveals += 1; changed = true;
+          const r = E.rollReveal(this.rng); p.revealed = true; p.size = r.size; p.mutation = this.life.goldenReroll(rec.villageId, r.mutation, this.rng) as typeof r.mutation; p.lastWeeded = now; rec.stats.reveals += 1; changed = true;
           this.send(l.ws, { t: 'reveal', plant: p });
           if (p.mutation !== 'none') this.feed(rec.villageId, 'reveal', `${rec.name}'s ${SP.get(p.speciesId)!.name} sprouted ${MUT[p.mutation]}`);
         }

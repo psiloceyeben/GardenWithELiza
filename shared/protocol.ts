@@ -11,7 +11,13 @@ export interface Defenses {
 }
 
 /** What everyone in the village may see about a lot. */
-export interface PublicPlot { i: number; speciesId: string; tier: Tier; revealed: boolean; size: number; mutation: MutationId; lockedUntil: number; }
+export interface PublicPlot { i: number; speciesId: string; tier: Tier; revealed: boolean; size: number; mutation: MutationId; lockedUntil: number; weedy: boolean; }
+
+/** Wild seed on the village grounds (phase one: foraging). */
+export interface Wild { id: string; x: number; y: number; speciesId: string; tier: Tier; until: number; }
+export type EventKind = 'seed_rain' | 'screaming_hour' | 'golden_hour';
+export interface VillageEvent { kind: EventKind; startedAt: number; endsAt: number; }
+export interface SprintEntry { name: string; ms: number; at: number; }
 export interface PublicLot {
   lotId: number;
   ownerId: string;
@@ -66,6 +72,8 @@ export type ClientMsg =
   | { t: 'nonce'; address: string }
   | { t: 'link'; address: string; signature: string }
   | { t: 'unlink' }
+  | { t: 'forage'; id: string }
+  | { t: 'sprint' }
   | { t: 'ping'; n: number };
 
 export interface FeedEvent { at: number; kind: 'steal' | 'tag' | 'gate' | 'reveal' | 'join' | 'uproot' | 'break'; text: string; }
@@ -86,7 +94,23 @@ export type ServerMsg =
   | { t: 'error'; text: string }
   | { t: 'nonce'; address: string; message: string }
   | { t: 'linked'; address: string | null; land: LandView; plotCount: number; rarityFloor: Tier }
+  | { t: 'wild'; add?: Wild[]; remove?: string[]; all?: Wild[] }
+  | { t: 'event'; ev: VillageEvent | null }
+  | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }
+  | { t: 'board'; sprint: SprintEntry[] }
   | { t: 'pong'; n: number; now: number };
+
+// Phase one [TUNABLE]
+export const WILD_MAX = 8;
+export const WILD_SPAWN_MS = 90_000;
+export const WILD_TTL_MS = 10 * 60_000;
+export const EVENT_PERIOD_MS = 20 * 60_000;
+export const EVENT_LEN_MS = 3 * 60_000;
+export const WEEDY_AFTER_MS = 20 * 60_000;
+export const WEEDY_FACTOR = 0.5;
+export const SPRINT_REWARD = 20;
+export const SPRINT_RECORD_BONUS = 50;
+export const SPRINT_COOLDOWN_MS = 5 * 60_000;
 
 // Raid rules (bible §3.2) [TUNABLE]
 export const UPROOT_MS = 3000;

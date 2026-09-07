@@ -48,6 +48,8 @@
     .row { display:flex; justify-content:space-between; padding:3px 0; font-size:8px; }
     .note { color:var(--dim); font-size:7px; line-height:1.6; margin-top:4px; }
     .emotes { display:flex; gap:8px; flex-wrap:wrap; } .emotes button { font-size:18px; }
+    #banner { position:fixed; top:40px; left:50%; transform:translateX(-50%); background:rgba(60,40,20,.92); border:2px solid var(--sap); color:var(--sap); padding:6px 12px; font-size:8px; text-align:center; pointer-events:none; z-index:6; line-height:1.6; }
+    #banner[hidden] { display:none; }
     #toast { position:fixed; top:64px; left:50%; transform:translateX(-50%); background:rgba(24,18,32,.92); border:2px solid var(--edge); padding:8px 12px; font-size:8px; max-width:70vw; text-align:center; transition:opacity .3s; opacity:0; pointer-events:none; line-height:1.6; z-index:6; }
     #toast.on { opacity:1; }
     #modal, #name-modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:10; }
@@ -69,6 +71,7 @@
   <div id="game"></div>
   <div id="hud"><div><span class="sap" id="sap">0</span> <span class="dim">Sap</span> <span class="dim"><span id="sps">0</span>/s · <span id="plots">0/6</span></span></div><div class="dim" id="village"></div><div id="carry" hidden></div></div>
   <div id="feed"></div>
+  <div id="banner" hidden></div>
   <div id="toast"></div>
   <div id="chatlog"></div>
   <input id="chat" maxlength="80" autocomplete="off" />
@@ -82,6 +85,7 @@
     <button data-panel="emotes" id="btn-emotes">Emotes</button>
     <button data-panel="land" id="btn-land">Land</button>
     <button data-panel="odds" id="btn-odds">Odds</button>
+    <button id="btn-mute">♪</button>
   </div>
   <div id="panel" hidden><h2><span id="panel-title"></span><button id="panel-close">X</button></h2><div id="panel-body"></div></div>
   <div id="modal" hidden><div class="card" id="modal-card"></div></div>

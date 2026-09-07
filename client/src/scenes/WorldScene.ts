@@ -62,6 +62,11 @@ export class WorldScene extends Phaser.Scene {
   lastSend = 0; hue = 0; ready = false;
   villageBiome = 0;
   linking = false;
+  wilds = new Map<string, { w: P.Wild; sprite: Phaser.GameObjects.Sprite; glow: Phaser.GameObjects.Image }>();
+  event: P.VillageEvent | null = null;
+  board: P.SprintEntry[] = [];
+  sprintStartedAt = 0;
+  lastSecond = 0; lastStep = 0;
 
   constructor() { super('world'); }
 
@@ -161,6 +166,20 @@ export class WorldScene extends Phaser.Scene {
       case 'channel': this.channel = m.kind ? { kind: m.kind, start: Date.now(), dur: m.endsAt - m.startedAt } : null; if (m.kind) sfx.plant(); break;
       case 'carry': this.carrying = m.speciesId; this.setCarry(this.player, this.myCarry, m.speciesId, (i) => { this.myCarry = i; }); if (m.speciesId) { sfx.scream(); this.hud.toast(COPY.runHome, 3000); } this.hud.refresh(); break;
       case 'error': this.hud.toast(m.text, 5000); break;
+      case 'wild': {
+        if (m.all) { for (const v of this.wilds.values()) { v.sprite.destroy(); v.glow.destroy(); } this.wilds.clear(); for (const w of m.all) this.addWild(w); }
+        for (const w of m.add ?? []) this.addWild(w);
+        for (const id of m.remove ?? []) { const v = this.wilds.get(id); if (v) { v.sprite.destroy(); v.glow.destroy(); this.wilds.delete(id); } }
+        break;
+      }
+      case 'event': this.event = m.ev; this.hud.banner(Date.now()); if (m.ev?.kind === 'screaming_hour') this.screamingHour(); break;
+      case 'board': this.board = m.sprint; this.hud.refresh(); break;
+      case 'sprint':
+        if (m.phase === 'start') { this.sprintStartedAt = Date.now(); this.hud.toast(COPY.sprintStart, 3000); sfx.buy(); }
+        else if (m.phase === 'turn') { this.hud.toast(COPY.sprintTurn, 2000); sfx.tend(); }
+        else if (m.phase === 'finish') { this.sprintStartedAt = 0; this.hud.toast(`${COPY.sprintDone} ${((m.ms ?? 0) / 1000).toFixed(2)} s${m.record ? ` · ${COPY.sprintRecord}` : ''}`, 4000); if (m.record) sfx.fanfare(); else sfx.buy(); }
+        else { this.sprintStartedAt = 0; }
+        this.hud.banner(Date.now()); break;
       case 'nonce': void this.onNonce(m.address, m.message); break;
       case 'linked': if (this.you) { this.you.land = m.land; this.you.plotCount = m.plotCount; this.you.rarityFloor = m.rarityFloor; } this.hud.refresh(); if (m.address) this.hud.open('land'); break;
       case 'pong': break;
@@ -226,8 +245,11 @@ export class WorldScene extends Phaser.Scene {
       const lock = view.locks.get(p.i);
       if (p.lockedUntil > Date.now() && !lock) view.locks.set(p.i, this.add.image(pos.x + 10, pos.y - 26, 'ui', 'lockicon').setDepth(pos.y + 1).setScale(0.6));
       else if (p.lockedUntil <= Date.now() && lock) { lock.destroy(); view.locks.delete(p.i); }
+      const wk = -1000 - p.i; const weed = view.locks.get(wk);
+      if (p.weedy && !weed) view.locks.set(wk, this.add.image(pos.x, pos.y - 12, 'plaza', 'weeds').setDepth(pos.y + 2));
+      else if (!p.weedy && weed) { weed.destroy(); view.locks.delete(wk); }
     }
-    for (const [i, s] of view.plants) if (!present.has(i)) { s.destroy(); view.plants.delete(i); this.clearFx(view, i); view.locks.get(i)?.destroy(); view.locks.delete(i); }
+    for (const [i, s] of view.plants) if (!present.has(i)) { s.destroy(); view.plants.delete(i); this.clearFx(view, i); view.locks.get(i)?.destroy(); view.locks.delete(i); view.locks.get(-1000 - i)?.destroy(); view.locks.delete(-1000 - i); }
     // defenses
     if (l.defenses.gnome && !view.gnome) view.gnome = this.add.sprite(geo.center.x, geo.center.y, 'chars', 'gnome0').setOrigin(0.5, 30 / 32).play('gnome');
     if (!l.defenses.gnome && view.gnome) { view.gnome.destroy(); view.gnome = null; }
@@ -237,6 +259,29 @@ export class WorldScene extends Phaser.Scene {
   }
 
   clearFx(view: LotView, i: number): void { for (const o of view.fx.get(i) ?? []) o.destroy(); view.fx.delete(i); }
+
+  // ------------------------------------------------------------ wild seeds, events
+  addWild(w: P.Wild): void {
+    if (this.wilds.has(w.id)) return;
+    const sprite = this.add.sprite(w.x, w.y + 12, 'plants', `${w.speciesId}_grow1`).setOrigin(0.5, 44 / 48).setDepth(w.y + 12);
+    const glow = this.add.image(w.x + 8, w.y - 14, 'ui', 'sparkle').setDepth(w.y + 13).setScale(0.4).setAlpha(0.7);
+    this.tweens.add({ targets: glow, alpha: 0.15, scale: 0.7, duration: 700, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: sprite, y: w.y + 10, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.wilds.set(w.id, { w, sprite, glow });
+  }
+  nearestWild(): { w: P.Wild; d: number } | null {
+    let best: { w: P.Wild; d: number } | null = null;
+    for (const v of this.wilds.values()) { const d = Math.hypot(v.w.x - this.player.x, v.w.y - this.player.y); if (d < 44 && (!best || d < best.d)) best = { w: v.w, d }; }
+    return best;
+  }
+  screamingHour(): void {
+    let i = 0;
+    for (const v of this.lots.values()) for (const [idx, s] of v.plants) { const p = v.lot.plots.find((x) => x.i === idx); if (p?.revealed) this.time.delayedCall(200 * (i++ % 15), () => this.scream({ x: s.x, y: s.y })); }
+  }
+  wetMark(x: number, y: number): void {
+    const r = this.add.rectangle(x, y, 30, 30, 0x3060c0, 0.35).setDepth(1.5);
+    this.tweens.add({ targets: r, alpha: 0, duration: 60_000, onComplete: () => r.destroy() });
+  }
 
   /** Layer C on the map: lot interior in the wallet's biome, plot tiles, conviction tree, wither stumps, decor flora. */
   applyLand(view: LotView): void {
@@ -312,6 +357,8 @@ export class WorldScene extends Phaser.Scene {
     this.drawOverlays(now);
     if (this.hue++ % 4 === 0) this.tickHolo(now);
     this.dayNight(now);
+    if (now - this.lastSecond >= 1000) { this.lastSecond = now; this.hud.banner(now); if (sfx.ready) { sfx.ambientStart(this.villageBiome); const f = this.village.props.find((p) => p.kind === 'fountain'); if (f) sfx.fountain(1 - Math.min(1, Math.hypot(f.tx * TILE + 32 - this.player.x, f.ty * TILE + 32 - this.player.y) / 260)); } }
+    if (this.moving && now - this.lastStep > 260) { this.lastStep = now; sfx.step(); }
     if (now - this.lastSend >= 100 && (this.moving || this.lastSend === 0 || this.player.getData('dirty'))) { this.lastSend = now; this.player.setData('dirty', false); this.net.send({ t: 'input', dx: this.joy.x, dy: this.joy.y, x: Math.round(this.player.x), y: Math.round(this.player.y), d: this.dir, f: this.flip, m: this.moving }); }
   }
 
@@ -428,10 +475,18 @@ export class WorldScene extends Phaser.Scene {
         return;
       }
     }
+    for (const { w } of this.wilds.values()) {
+      if (Math.abs(w.x - x) <= 16 && Math.abs(w.y - y) <= 20) {
+        const act = () => { this.net.send({ t: 'forage', id: w.id }); sfx.forage(); };
+        if (Math.hypot(w.x - this.player.x, w.y - this.player.y) < 44) act(); else this.goTo({ x: w.x, y: w.y }, act);
+        return;
+      }
+    }
     const v = this.village!;
     if (Math.abs(x - (v.conveyor.tx * TILE + 32)) < 40 && Math.abs(y - (v.conveyor.ty * TILE)) < 32) { this.hud.open('conveyor'); return; }
     if (Math.abs(x - (v.board.tx * TILE + 32)) < 36 && Math.abs(y - (v.board.ty * TILE)) < 32) { this.hud.open('feed'); return; }
-    if (Math.abs(x - (v.track.tx * TILE + 32)) < 36 && Math.abs(y - (v.track.ty * TILE + 16)) < 20) { this.hud.open('shop'); return; }
+    const tr = { x: v.track.tx * TILE + 32, y: v.track.ty * TILE + 16 };
+    if (Math.abs(x - tr.x) < 36 && Math.abs(y - tr.y) < 20) { const act = () => this.net.send({ t: 'sprint' }); if (Math.hypot(tr.x - this.player.x, tr.y - this.player.y) < 48) act(); else this.goTo({ x: tr.x, y: tr.y + 6 }, act); return; }
     this.goTo({ x, y });
   }
 
@@ -440,7 +495,11 @@ export class WorldScene extends Phaser.Scene {
     this.path = p ?? [target]; this.pathAct = act ?? null;
   }
 
-  interactNearest(): void { const n = this.nearestPlot(); if (n) this.interactPlot(n.view, n.i); }
+  interactNearest(): void {
+    const w = this.nearestWild(); const n = this.nearestPlot();
+    if (w && (!n || w.d < Math.hypot(n.pos.x - this.player.x, n.pos.y - this.player.y))) { this.net.send({ t: 'forage', id: w.w.id }); sfx.forage(); return; }
+    if (n) this.interactPlot(n.view, n.i);
+  }
 
   interactPlot(v: LotView, i: number): void {
     const p = v.lot.plots.find((x) => x.i === i) ?? null;
@@ -450,7 +509,7 @@ export class WorldScene extends Phaser.Scene {
         if (this.selectedSeed) { this.net.send({ t: 'plant', seedUid: this.selectedSeed, plotId: i }); this.selectedSeed = null; sfx.plant(); this.splash(v.geo.plots[i].tx * TILE + 16, v.geo.plots[i].ty * TILE + 16, 0x8c5a3c); }
         else if (this.you!.seeds.length) this.hud.open('seeds');
         else { this.hud.toast(COPY.emptySeeds); this.hud.open('conveyor'); }
-      } else { this.net.send({ t: 'tend', plotId: i }); sfx.tend(); this.splash(v.geo.plots[i].tx * TILE + 16, v.geo.plots[i].ty * TILE + 6, 0x78c8f0); }
+      } else { this.net.send({ t: 'tend', plotId: i }); sfx.tend(); this.splash(v.geo.plots[i].tx * TILE + 16, v.geo.plots[i].ty * TILE + 6, 0x78c8f0); if (!p.revealed) this.wetMark(v.geo.plots[i].tx * TILE + 16, v.geo.plots[i].ty * TILE + 16); }
       return;
     }
     if (p && p.revealed) this.net.send({ t: 'uproot', ownerId: v.lot.ownerId, plotId: i });

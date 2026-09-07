@@ -4,6 +4,7 @@ import * as E from '@shared/economy';
 import * as P from '@shared/protocol';
 import { COPY, TIER_NAME, MUTATION_NAME, MUTATION_FLAVOR, speciesById } from '../content';
 import type { WorldScene } from '../scenes/WorldScene';
+import { sfx } from '../audio';
 
 type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -22,6 +23,8 @@ export class Hud {
     $('panel-close').addEventListener('click', () => this.close());
     $('btn-conveyor').textContent = COPY.conveyorShort; $('btn-seeds').textContent = COPY.bag; $('btn-shop').textContent = COPY.shop;
     $('btn-feed').textContent = COPY.feed.split(' ')[1] ?? COPY.feed; $('btn-emotes').textContent = COPY.emotes; $('btn-odds').textContent = COPY.odds; $('btn-land').textContent = COPY.landTitle.split(' ')[1] ?? COPY.landTitle;
+    const mute = $('btn-mute'); const paintMute = () => { mute.textContent = sfx.muted ? '♪ ' + COPY.off : '♪ ' + COPY.on; }; paintMute();
+    mute.addEventListener('click', () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); });
     const chat = $<HTMLInputElement>('chat'); chat.placeholder = COPY.chatPlaceholder;
     chat.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { const t = chat.value.trim(); if (t) this.scene.chat(t); chat.value = ''; chat.blur(); } if (e.key === 'Escape') chat.blur(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && document.activeElement !== chat && $('modal').hidden && $('name-modal').hidden) { chat.focus(); e.preventDefault(); } });
@@ -66,6 +69,15 @@ export class Hud {
   close(): void { this.open_ = null; $('panel').hidden = true; }
   toast(msg: string, ms = 2500): void { const t = $('toast'); t.textContent = msg; t.classList.add('on'); window.clearTimeout(this.toastTimer); this.toastTimer = window.setTimeout(() => t.classList.remove('on'), ms); }
 
+  /** Event banner + sprint timer; called once a second by the scene. */
+  banner(now: number): void {
+    const b = $('banner'); const ev = this.scene.event; const sp = this.scene.sprintStartedAt;
+    const parts: string[] = [];
+    if (ev) { const txt = ev.kind === 'seed_rain' ? COPY.evSeedRain : ev.kind === 'screaming_hour' ? COPY.evScreaming : COPY.evGolden; parts.push(`${txt} ${COPY.evEnds} ${this.fmtTime(ev.endsAt - now)}`); }
+    if (sp) parts.push(`${COPY.sprintDone} ${((now - sp) / 1000).toFixed(1)} s`);
+    b.hidden = !parts.length; b.textContent = parts.join('  ·  ');
+  }
+
   feedRender(): void {
     const f = $('feed'); const items = this.scene.feed.slice(0, 4);
     f.innerHTML = items.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('');
@@ -106,8 +118,9 @@ export class Hud {
         + row(COPY.defLock, COPY.defLockDesc, `${P.SHOP_PRICES.lock} ${COPY.sap}`, COPY.buy, 'lock', you.sap < P.SHOP_PRICES.lock || !you.plots.some((p) => p));
       body.querySelectorAll<HTMLButtonElement>('[data-shop]').forEach((b) => b.addEventListener('click', () => this.scene.shop(b.dataset.shop as 'train')));
     } else if (id === 'feed') {
-      title.textContent = COPY.feed;
-      body.innerHTML = this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`;
+      title.textContent = COPY.board;
+      const board = this.scene.board.length ? this.scene.board.map((e, i) => `<div class="row"><span>${i + 1}. ${esc(e.name)}</span><span>${(e.ms / 1000).toFixed(2)} s</span></div>`).join('') : `<div class="note">${COPY.sprintHint}</div>`;
+      body.innerHTML = `<div class="note">${COPY.sprintBoard}</div>${board}<div class="note">${COPY.feed}</div>` + (this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`);
     } else if (id === 'emotes') {
       title.textContent = COPY.emotes;
       body.innerHTML = `<div class="emotes">${P.EMOTES.map((e, i) => `<button data-emote="${i}">${e}</button>`).join('')}</div>`;

@@ -12,7 +12,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const hex = (n) => [...Array(n)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
 
 class Bot {
-  constructor(name) { this.name = name; this.id = hex(16); this.secret = hex(32); this.x = 0; this.y = 0; this.you = null; this.lots = new Map(); this.village = null; this.carry = null; this.channel = null; this.log = []; }
+  constructor(name) { this.wilds = new Map(); this.name = name; this.id = hex(16); this.secret = hex(32); this.x = 0; this.y = 0; this.you = null; this.lots = new Map(); this.village = null; this.carry = null; this.channel = null; this.log = []; }
   connect() {
     return new Promise((res) => {
       this.ws = new WebSocket(URL);
@@ -30,7 +30,8 @@ class Bot {
     else if (m.t === 'carry') { this.carry = m.speciesId; this.say(`carry=${m.speciesId}`); }
     else if (m.t === 'channel') { this.channel = m.kind; this.say(`channel=${m.kind}`); }
     else if (m.t === 'reveal') this.say(`REVEAL ${m.plant.speciesId} size=${m.plant.size} mut=${m.plant.mutation}`);
-    else if (m.t === 'error') this.say(`ERROR ${m.text}`);
+    else if (m.t === "error") this.say(`ERROR ${m.text}`);
+    else if (m.t === "wild") { for (const w of m.all || []) this.wilds.set(w.id, w); for (const w of m.add || []) this.wilds.set(w.id, w); for (const id of m.remove || []) this.wilds.delete(id); }
     else if (m.t === 'snap') { const me = m.p.find((p) => p.id === this.id); if (me && Math.hypot(me.x - this.x, me.y - this.y) > 48) { this.say(`server corrected me to ${me.x},${me.y}`); this.x = me.x; this.y = me.y; } }
   }
   say(s) { const line = `[${this.name}] ${s}`; this.log.push(line); console.log(line); }
@@ -110,6 +111,24 @@ class Bot {
   alice.send({ t: 'nonce', address }); await sleep(300);
   alice.send({ t: 'link', address, signature: '0x' + '11'.repeat(65) }); await sleep(400);
   check(alice.you.land.address === address, 'bad signature does not change the link');
+  // phase one: forage a wild seed, run a sprint lap
+  const wilds = bob.wilds; const origOnB = bob.on.bind(bob);
+  bob.on = (m) => { if (m.t === "sprint") bob.sprint = m; if (m.t === "event") bob.event = m.ev; origOnB(m); };
+  for (let i = 0; i < 40 && !wilds.size; i++) await sleep(250);
+  check(wilds.size > 0, `wild seeds spawned (${wilds.size})`);
+  if (wilds.size) {
+    const w = [...wilds.values()][0]; const before = bob.you.seeds.length;
+    await bob.walkTo({ x: w.x, y: w.y }); bob.send({ t: "forage", id: w.id }); await sleep(400);
+    check(bob.you.seeds.length === before + 1 && !wilds.has(w.id), 'foraged the wild seed (bag +1, wild removed for everyone)');
+  }
+  const tr = { x: bob.village.track.tx * W.TILE + 32, y: bob.village.track.ty * W.TILE + 16 };
+  const fo = bob.village.props.find((p) => p.kind === 'fountain'); const fx = { x: fo.tx * W.TILE + 32, y: fo.ty * W.TILE + 32 + 40 };
+  await bob.walkTo({ x: tr.x, y: tr.y + 6 }); bob.send({ t: 'sprint' }); await sleep(300);
+  check(bob.sprint && bob.sprint.phase === 'start', 'sprint started at the track');
+  await bob.walkTo(fx); await sleep(200);
+  check(bob.sprint && bob.sprint.phase === 'turn', 'sprint turn at the fountain');
+  const sapBefore = bob.you.sap; await bob.walkTo({ x: tr.x, y: tr.y + 6 }); await sleep(400);
+  check(bob.sprint && bob.sprint.phase === 'finish' && bob.you.sap > sapBefore, `sprint finished (${bob.sprint && bob.sprint.ms} ms, record=${bob.sprint && bob.sprint.record}, +sap)`);
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS');
   alice.ws.close(); bob.ws.close(); process.exit(fails.length ? 1 : 0);
 })();

@@ -133,7 +133,7 @@ def build(out):
     for fr in range(3): chars.append((f"gnome{fr}", gnome(fr)))
     for fr in range(2): chars.append((f"npc{fr}", npc(fr)))
     pack(chars, 32, 32, 8, 'chars', out)
-    pk = [(k, plaza(k)) for k in ('fountain0', 'fountain1', 'lamp0', 'lamp1', 'bench', 'board', 'stall', 'sign', 'track', 'pot')] + [(f'decor{i}', decor(i)) for i in range(3)]
+    pk = [(k, plaza(k)) for k in ('fountain0', 'fountain1', 'lamp0', 'lamp1', 'bench', 'board', 'stall', 'sign', 'track', 'pot')] + [(f'decor{i}', decor(i)) for i in range(3)] + [('weeds', weeds())]
     pack(pk, 64, 64, 5, 'plaza', out)
     return len(base), len(BIOMES), len(chars), len(pk)
 
@@ -152,4 +152,12 @@ def decor(i):
         for y in range(44, 14, -1):
             cv.set(16 + round(4 * math.sin((44 - y) / 3.0)), y, 't'); cv.set(17 + round(4 * math.sin((44 - y) / 3.0)), y, 'T')
         cv.ellipse(16, 14, 3, 2, 'p'); cv.ellipse(16, 44, 5, 2, 'g')
+    cv.outline(); return cv
+
+
+def weeds():
+    cv = Canvas(32, 32); rnd = random.Random(9)
+    for _ in range(7):
+        x, y = rnd.randrange(3, 27), rnd.randrange(8, 26)
+        cv.line(x, y + 6, x - 2, y, 'G'); cv.line(x, y + 6, x + 1, y - 1, 'L'); cv.line(x, y + 6, x + 3, y + 1, 'G')
     cv.outline(); return cv
