@@ -105,7 +105,7 @@ export class Life {
         const reward = P.SPRINT_REWARD + (record ? P.SPRINT_RECORD_BONUS : 0); this.game.addSap(rec, reward, 'sprint');
         const best = Math.min(ms, ...board.filter((b) => b.name === rec.name).map((b) => b.ms));
         this.game.send(l.ws, { t: 'sprint', phase: 'finish', ms, best, record }); this.game.pushState(rec, { sap: rec.sap });
-        this.game.broadcast(this.game.vid(rec), { t: "board", sprint: vrec.sprint, bounties: this.game.bountiesIn(this.game.vid(rec), now) });
+        this.game.broadcast(this.game.vid(rec), this.game.boardMsg(this.game.vid(rec), now));
         if (record) this.game.feed(this.game.vid(rec), 'tag', `${rec.name} set the sprint record: ${(ms / 1000).toFixed(2)} s`);
       }
     }

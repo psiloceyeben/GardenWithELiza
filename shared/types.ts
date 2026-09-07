@@ -27,6 +27,7 @@ export interface Plant {
   mutation: MutationId;
   watered: boolean;
   lastWeeded: number;
+  nick?: string;         // owner-given name; travels with the plant when stolen
 }
 
 export interface Plot { id: number; plant: Plant | null; }

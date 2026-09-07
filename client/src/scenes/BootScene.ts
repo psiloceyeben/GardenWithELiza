@@ -17,9 +17,9 @@ export class BootScene extends Phaser.Scene {
     for (const sp of ROSTER) {
       this.anims.create({ key: `${sp.id}_idle`, frames: this.anims.generateFrameNames('plants', { prefix: `${sp.id}_idle`, start: 0, end: 5 }), frameRate: 6, repeat: -1 });
     }
-    for (let v = 0; v < 6; v++) {
+    for (let v = 0; v < 6; v++) for (let h = 0; h < 4; h++) {
       for (const d of ['down', 'up', 'side', 'carry']) {
-        this.anims.create({ key: `walk${v}_${d}`, frames: this.anims.generateFrameNames('chars', { prefix: `farmer${v}_${d}`, start: 0, end: 1 }), frameRate: 6, repeat: -1 });
+        this.anims.create({ key: `walk${v}${h}_${d}`, frames: this.anims.generateFrameNames('chars', { prefix: `farmer${v}${h}_${d}`, start: 0, end: 1 }), frameRate: 6, repeat: -1 });
       }
     }
     this.anims.create({ key: 'gnome', frames: this.anims.generateFrameNames('chars', { prefix: 'gnome', start: 0, end: 1 }), frameRate: 3, repeat: -1 });

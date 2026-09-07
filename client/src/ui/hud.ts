@@ -119,13 +119,27 @@ export class Hud {
         + row(COPY.defScarecrow, COPY.defScarecrowDesc, d.scarecrow ? COPY.owned : `${P.SHOP_PRICES.scarecrow} ${COPY.sap}`, d.scarecrow ? COPY.owned : COPY.buy, 'scarecrow', !!d.scarecrow || d.gnome || you.sap < P.SHOP_PRICES.scarecrow)
         + row(COPY.defMud, COPY.defMudDesc, d.mud ? COPY.owned : `${P.SHOP_PRICES.mud} ${COPY.sap}`, d.mud ? COPY.owned : COPY.buy, 'mud', !!d.mud || you.sap < P.SHOP_PRICES.mud)
         + row(COPY.defBell, COPY.defBellDesc, d.bell ? COPY.owned : `${P.SHOP_PRICES.bell} ${COPY.sap}`, d.bell ? COPY.owned : COPY.buy, 'bell', !!d.bell || you.sap < P.SHOP_PRICES.bell);
+      // cosmetics (pure Sap sinks) + wardrobe
+      const c = you.cosmetics; const cosRow = (label: string, item: P.CosmeticItem, owned: boolean, dis = false) => `<div class="row"><span>${label}</span><span><span class="price">${owned ? COPY.owned : `${P.COSMETIC_PRICES[item]} ${COPY.sap}`}</span> <button data-cos="${item}" ${owned || dis || you.sap < P.COSMETIC_PRICES[item] ? 'disabled' : ''}>${COPY.buy}</button></span></div>`;
+      const hasGnome = d.gnome || !!d.scarecrow;
+      body.innerHTML += `<div class="note">${COPY.cosmetics}</div>` + cosRow(COPY.cosFenceWood, 'fence_wood', c.fence === 'wood') + cosRow(COPY.cosFenceStone, 'fence_stone', c.fence === 'stone') + cosRow(COPY.cosFenceHedge, 'fence_hedge', c.fence === 'hedge')
+        + cosRow(COPY.cosLantern, 'lantern', c.lantern) + cosRow(COPY.cosNameplate, 'nameplate', c.nameplate) + cosRow(COPY.cosPath, 'path', c.path)
+        + cosRow(COPY.cosGhat0, 'ghat0', c.gnomeHat === 0, !hasGnome) + cosRow(COPY.cosGhat1, 'ghat1', c.gnomeHat === 1, !hasGnome) + cosRow(COPY.cosGhat2, 'ghat2', c.gnomeHat === 2, !hasGnome);
+      const hats = COPY.hatNames.split('|'); const shirtCols = ['#3c78dc', '#d03434', '#469640', '#9646b4', '#e88228', '#3caaa0'];
+      body.innerHTML += `<div class="note">${COPY.wardrobe}</div><div class="row"><span>${COPY.shirt} (${P.SHIRT_PRICE} ${COPY.sap})</span><span>${shirtCols.map((col, i) => `<button data-shirt="${i}" style="background:${col};width:22px;padding:6px 0" ${i === you.color ? 'disabled' : ''}> </button>`).join(' ')}</span></div>`
+        + hats.map((h, i) => `<div class="row"><span>${h}</span><span><span class="price">${i === you.hat ? COPY.worn : P.HAT_PRICES[i] ? `${P.HAT_PRICES[i]} ${COPY.sap}` : ''}</span> <button data-hat="${i}" ${i === you.hat ? 'disabled' : ''}>${COPY.wear}</button></span></div>`).join('');
+      body.querySelectorAll<HTMLButtonElement>('[data-cos]').forEach((b) => b.addEventListener('click', () => this.scene.cosmetic(b.dataset.cos as P.CosmeticItem)));
+      body.querySelectorAll<HTMLButtonElement>('[data-shirt]').forEach((b) => b.addEventListener('click', () => this.scene.wardrobe(Number(b.dataset.shirt), undefined)));
+      body.querySelectorAll<HTMLButtonElement>('[data-hat]').forEach((b) => b.addEventListener('click', () => this.scene.wardrobe(undefined, Number(b.dataset.hat))));
       body.querySelectorAll<HTMLButtonElement>('[data-shop]').forEach((b) => b.addEventListener('click', () => this.scene.shop(b.dataset.shop as P.ShopItem)));
     } else if (id === 'feed') {
       title.textContent = COPY.board;
       const board = this.scene.board.length ? this.scene.board.map((e, i) => `<div class="row"><span>${i + 1}. ${esc(e.name)}</span><span>${(e.ms / 1000).toFixed(2)} s</span></div>`).join('') : `<div class="note">${COPY.sprintHint}</div>`;
       const bounties = this.scene.bounties.length ? this.scene.bounties.map((b) => `<div class="row"><span class="m-screaming">${COPY.wanted}: ${esc(b.thiefName)}</span><span class="price">${b.amount} ${COPY.sap}</span></div>`).join('') : '';
       const thieves = you.stolenBy.length ? you.stolenBy.map((t) => `<div class="row"><span>${esc(t.name)}</span><button data-bounty="${t.id}" ${you.sap < 100 ? 'disabled' : ''}>${COPY.postBounty} 100</button></div>`).join('') : `<div class="note">${COPY.noThieves}</div>`;
-      body.innerHTML = `<div class="note">${COPY.sprintBoard}</div>${board}<div class="note">${COPY.bounties}</div>${bounties}<div class="note">${COPY.recentThieves}</div>${thieves}<div class="note">${COPY.feed}</div>` + (this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`);
+      const tr = this.scene.trophies; const list = (xs: { name: string; n: number }[]) => xs.length ? xs.map((x) => `${esc(x.name)} ${x.n}`).join(', ') : '—';
+      const trophies = tr ? `<div class="row"><span>${COPY.trophySteals}</span><span>${list(tr.steals)}</span></div><div class="row"><span>${COPY.trophyTags}</span><span>${list(tr.tags)}</span></div><div class="row"><span>${COPY.trophyHeist}</span><span>${tr.heists.length ? tr.heists.map((h) => `${esc(h.name)}: <span class="t-${h.tier}">${esc(h.species)}</span>`).join(', ') : '—'}</span></div>` : '';
+      body.innerHTML = `<div class="note">${COPY.trophies}</div>${trophies}<div class="note">${COPY.sprintBoard}</div>${board}<div class="note">${COPY.bounties}</div>${bounties}<div class="note">${COPY.recentThieves}</div>${thieves}<div class="note">${COPY.feed}</div>` + (this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`);
       body.querySelectorAll<HTMLButtonElement>('[data-bounty]').forEach((b) => b.addEventListener('click', () => this.scene.postBounty(b.dataset.bounty!, 100)));
     } else if (id === 'villages') {
       title.textContent = COPY.villages;
@@ -149,6 +163,9 @@ export class Hud {
         + (addr ? `<div class="row"><span>${COPY.landTree}</span><span>${stages[land.treeStage]}</span></div><div class="row"><span>${COPY.landStumps}</span><span>${land.witherMarks}</span></div><div class="row"><span>${COPY.landHybrids}</span><span>${land.hybrids ? '✓' : '—'}</span></div>` : '')
         + `<div class="note">${COPY.connectHint}</div><div class="buy" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">`
         + (addr ? `<button id="btn-share">${COPY.share}</button><button id="btn-unlink">${COPY.disconnect}</button>` : `<button id="btn-connect">${COPY.connect}</button>`) + `</div>`;
+      const plants = you.plots.map((p, i) => p ? `<div class="row"><span>${esc(speciesById(p.speciesId).name)}</span><span><input data-nick="${i}" maxlength="14" value="${esc(p.nick ?? '')}" placeholder="${COPY.nickPrompt}" style="width:130px;padding:4px 6px;font-size:8px"></span></div>` : '').join('');
+      body.innerHTML += `<div class="note">${COPY.myPlants}. ${COPY.nickHint}</div>${plants}`;
+      body.querySelectorAll<HTMLInputElement>('[data-nick]').forEach((inp) => { inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { this.scene.nick(Number(inp.dataset.nick), inp.value); inp.blur(); this.toast(COPY.nickSet); } }); inp.addEventListener('change', () => this.scene.nick(Number(inp.dataset.nick), inp.value)); });
       body.querySelector('#btn-connect')?.addEventListener('click', () => void this.scene.connectWallet());
       body.querySelector('#btn-unlink')?.addEventListener('click', () => this.scene.unlinkWallet());
       body.querySelector('#btn-share')?.addEventListener('click', () => { if (share) { navigator.clipboard?.writeText(share).catch(() => undefined); this.toast(`${COPY.shareCopied}: ${share}`, 5000); } });

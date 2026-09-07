@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import type { GardenSpec } from '../shared/derive/types';
-import { T, LOT_W, LOT_H, TILE } from '../shared/world';
+import { T, LOT_W, LOT_H, TILE, TILE_STRIDE } from '../shared/world';
 
 interface Atlas { png: PNG; frames: Record<string, { frame: { x: number; y: number; w: number; h: number } }> }
 const cache = new Map<string, Atlas | PNG>();
@@ -40,7 +40,7 @@ export function renderLot(spriteDir: string, lot: ShareLot, scale = 2): Buffer {
   const { spec } = lot; const W = (LOT_W + 4) * TILE; const H = (LOT_H + 4) * TILE;
   const out = new PNG({ width: W * scale, height: H * scale });
   const tiles = loadPng(spriteDir, `tiles_b${spec.biome}`); const plants = loadAtlas(spriteDir, 'plants'); const props = loadAtlas(spriteDir, 'props'); const plaza = loadAtlas(spriteDir, 'plaza');
-  const tile = (idx: number, tx: number, ty: number) => blit(out, tiles, (idx % 16) * TILE, Math.floor(idx / 16) * TILE, TILE, TILE, tx * TILE * scale, ty * TILE * scale, scale);
+  const tile = (idx: number, tx: number, ty: number) => blit(out, tiles, (idx % TILE_STRIDE) * TILE, Math.floor(idx / TILE_STRIDE) * TILE, TILE, TILE, tx * TILE * scale, ty * TILE * scale, scale);
   const frame = (a: Atlas, name: string, x: number, y: number, flipY = false) => { const f = a.frames[name]; if (f) blit(out, a.png, f.frame.x, f.frame.y, f.frame.w, f.frame.h, x * scale, y * scale, scale, flipY); };
   // ground + lot
   for (let ty = 0; ty < LOT_H + 4; ty++) for (let tx = 0; tx < LOT_W + 4; tx++) tile((tx * 7 + ty * 3) % 5 === 0 ? T.grass2 : T.grass, tx, ty);

@@ -3,7 +3,7 @@ import type { Plant, Tier } from '@shared/types';
 import * as E from '@shared/economy';
 import * as P from '@shared/protocol';
 import type { ServerMsg, PrivateState, PublicLot, SnapPlayer, Dir, FeedEvent } from '@shared/protocol';
-import { buildVillage, moveActor, findPath, lotAtPx, lotGatePx, TILE, T, VILLAGE_W, VILLAGE_H, type Village, type Lot } from '@shared/world';
+import { buildVillage, moveActor, findPath, lotAtPx, lotGatePx, TILE, TILE_STRIDE, T, VILLAGE_W, VILLAGE_H, type Village, type Lot } from '@shared/world';
 import { speciesById, COPY } from '../content';
 import { Net, wsUrl, loadIdentity, newIdentity, type Identity } from '../net';
 import { hasWallet, connectAddress, signMessageWith } from '../wallet';
@@ -26,7 +26,7 @@ interface LotView {
   landKey: string;
   landObjs: Phaser.GameObjects.GameObject[];
 }
-interface Remote { sprite: Phaser.GameObjects.Sprite; tag: Phaser.GameObjects.Text; tx: number; ty: number; d: Dir; f: boolean; m: boolean; carry: Phaser.GameObjects.Image | null; carryId: string; bubble: Phaser.GameObjects.Text | null; bubbleUntil: number; color: number; }
+interface Remote { sprite: Phaser.GameObjects.Sprite; tag: Phaser.GameObjects.Text; tx: number; ty: number; d: Dir; f: boolean; m: boolean; carry: Phaser.GameObjects.Image | null; carryId: string; bubble: Phaser.GameObjects.Text | null; bubbleUntil: number; color: number; hat: number; }
 
 export class WorldScene extends Phaser.Scene {
   net!: Net;
@@ -37,7 +37,8 @@ export class WorldScene extends Phaser.Scene {
   villageName = '';
   layer!: Phaser.Tilemaps.TilemapLayer;
   lots = new Map<string, LotView>();
-  names = new Map<string, { name: string; color: number }>();
+  names = new Map<string, P.NameEntry>();
+  nickText!: Phaser.GameObjects.Text;
   remotes = new Map<string, Remote>();
   feed: FeedEvent[] = [];
   player!: Phaser.GameObjects.Sprite;
@@ -70,6 +71,7 @@ export class WorldScene extends Phaser.Scene {
   villageId = '';
   villages: P.VillageInfo[] = [];
   bounties: P.Bounty[] = [];
+  trophies: P.Trophies | null = null;
   wanted = new Map<string, Phaser.GameObjects.Text>();
 
   constructor() { super('world'); }
@@ -105,10 +107,10 @@ export class WorldScene extends Phaser.Scene {
     const rows: number[][] = [];
     for (let y = 0; y < VILLAGE_H; y++) { const r: number[] = []; for (let x = 0; x < VILLAGE_W; x++) r.push(v.grid[y * VILLAGE_W + x]); rows.push(r); }
     // every biome tileset lives in one layer (gid = biome*16 + tile) so each lot can wear its wallet's biome
-    for (const r of rows) for (let i = 0; i < r.length; i++) r[i] += biome * 16;
+    for (const r of rows) for (let i = 0; i < r.length; i++) r[i] += biome * TILE_STRIDE;
     const map = this.make.tilemap({ data: rows, tileWidth: TILE, tileHeight: TILE });
     const sets: Phaser.Tilemaps.Tileset[] = [];
-    for (let b = 0; b < BIOME_COUNT; b++) sets.push(map.addTilesetImage(`tiles_b${b}`, `tiles_b${b}`, TILE, TILE, 0, 0, b * 16)!);
+    for (let b = 0; b < BIOME_COUNT; b++) sets.push(map.addTilesetImage(`tiles_b${b}`, `tiles_b${b}`, TILE, TILE, 0, 0, b * TILE_STRIDE)!);
     this.layer = map.createLayer(0, sets, 0, 0)!.setDepth(0);
     this.villageBiome = biome;
     for (const p of v.props) {
@@ -127,8 +129,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   spawnPlayer(you: PrivateState, x: number, y: number): void {
-    this.player = this.add.sprite(x, y, 'chars', `farmer${you.color}_down0`).setOrigin(0.5, 30 / 32).setDepth(y);
+    this.player = this.add.sprite(x, y, 'chars', `farmer${you.color}${you.hat}_down0`).setOrigin(0.5, 30 / 32).setDepth(y);
     this.myTag = this.makeTag(you.name, you.color);
+    this.nickText = this.add.text(0, 0, '', { fontFamily: '"Press Start 2P", monospace', fontSize: '6px', color: '#f0c434', stroke: '#000', strokeThickness: 2, resolution: 3 }).setOrigin(0.5, 1).setDepth(8002).setVisible(false);
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
   }
 
@@ -179,7 +182,7 @@ export class WorldScene extends Phaser.Scene {
         break;
       }
       case 'event': this.event = m.ev; this.hud.banner(Date.now()); if (m.ev?.kind === 'screaming_hour') this.screamingHour(); break;
-      case 'board': this.board = m.sprint; if (m.bounties) this.bounties = m.bounties; this.hud.refresh(); break;
+      case 'board': this.board = m.sprint; if (m.bounties) this.bounties = m.bounties; if (m.trophies) this.trophies = m.trophies; this.hud.refresh(); break;
       case 'villages': this.villages = m.list; this.hud.refresh(); break;
       case 'sprint':
         if (m.phase === 'start') { this.sprintStartedAt = Date.now(); this.hud.toast(COPY.sprintStart, 3000); sfx.buy(); }
@@ -195,12 +198,13 @@ export class WorldScene extends Phaser.Scene {
 
   applySnap(p: SnapPlayer): void {
     let r = this.remotes.get(p.id);
-    const n = this.names.get(p.id) ?? { name: '?', color: 0 };
+    const n = this.names.get(p.id) ?? { name: '?', color: 0, hat: 0 };
     if (!r) {
-      const sprite = this.add.sprite(p.x, p.y, 'chars', `farmer${n.color}_down0`).setOrigin(0.5, 30 / 32).setDepth(p.y).setData('id', p.id);
-      r = { sprite, tag: this.makeTag(n.name, n.color), tx: p.x, ty: p.y, d: p.d, f: p.f, m: p.m, carry: null, carryId: '', bubble: null, bubbleUntil: 0, color: n.color };
+      const sprite = this.add.sprite(p.x, p.y, 'chars', `farmer${n.color}${n.hat}_down0`).setOrigin(0.5, 30 / 32).setDepth(p.y).setData('id', p.id);
+      r = { sprite, tag: this.makeTag(n.name, n.color), tx: p.x, ty: p.y, d: p.d, f: p.f, m: p.m, carry: null, carryId: '', bubble: null, bubbleUntil: 0, color: n.color, hat: n.hat };
       this.remotes.set(p.id, r);
     }
+    if (r.color !== n.color || r.hat !== n.hat) { r.color = n.color; r.hat = n.hat; r.sprite.stop(); r.sprite.setFrame(`farmer${n.color}${n.hat}_down0`); r.tag.setText(n.name); }
     r.tx = p.x; r.ty = p.y; r.d = p.d; r.f = p.f; r.m = p.m;
     if (r.carryId !== p.c) { r.carryId = p.c; this.setCarry(r.sprite, r.carry, p.c || null, (i) => { r!.carry = i; }); }
   }
@@ -241,7 +245,8 @@ export class WorldScene extends Phaser.Scene {
     const mine = l.ownerId === this.you?.id;
     const status = l.shielded ? ` (${COPY.shielded})` : l.online ? '' : ` (${COPY.offline})`;
     view.sign.setText(`${mine ? COPY.yourLot : l.name}${status}`).setColor(mine ? '#f0c434' : l.shielded ? '#8fc3ff' : '#fff');
-    this.layer.putTileAt(this.villageBiome * 16 + (l.defenses.gateHp > 0 ? T.gate_closed : T.gate_open), geo.gate.tx, geo.gate.ty);
+    const stone = l.cosmetics?.fence === 'stone';
+    this.layer.putTileAt(this.villageBiome * TILE_STRIDE + (l.defenses.gateHp > 0 ? (stone ? T.gate_closed2 : T.gate_closed) : (stone ? T.gate_open2 : T.gate_open)), geo.gate.tx, geo.gate.ty);
     // plants
     const present = new Set<number>();
     for (const p of l.plots) {
@@ -265,7 +270,11 @@ export class WorldScene extends Phaser.Scene {
     for (const [i, s] of view.plants) if (!present.has(i)) { s.destroy(); view.plants.delete(i); this.clearFx(view, i); view.locks.get(i)?.destroy(); view.locks.delete(i); view.locks.get(-1000 - i)?.destroy(); view.locks.delete(-1000 - i); }
     // defenses
     if (l.defenses.gnome && !view.gnome) view.gnome = this.add.sprite(geo.center.x, geo.center.y, 'chars', 'gnome0').setOrigin(0.5, 30 / 32).play('gnome');
-    if (!l.defenses.gnome && view.gnome) { view.gnome.destroy(); view.gnome = null; }
+    if (!l.defenses.gnome && view.gnome) { (view.gnome.getData('hat') as Phaser.GameObjects.Image | undefined)?.destroy(); view.gnome.destroy(); view.gnome = null; }
+    if (view.gnome) {
+      const want = l.cosmetics?.gnomeHat ?? -1; const cur = view.gnome.getData('hat') as Phaser.GameObjects.Image | undefined; const curId = view.gnome.getData('hatId') as number | undefined;
+      if (curId !== want) { cur?.destroy(); view.gnome.setData('hat', want >= 0 ? this.add.image(view.gnome.x, view.gnome.y - 28, 'ui', `ghat${want}`).setDepth(view.gnome.y + 1) : undefined).setData('hatId', want); }
+    }
     if (l.defenses.sprinkler && !view.sprinkler) view.sprinkler = this.add.sprite((geo.x + 1) * TILE + 16, (geo.y + 1) * TILE + 20, 'props', 'sprinkler0').setDepth((geo.y + 1) * TILE + 20).play('sprinkler');
     if (!l.defenses.sprinkler && view.sprinkler) { view.sprinkler.destroy(); view.sprinkler = null; }
     if (mine) this.hud.refresh();
@@ -299,13 +308,26 @@ export class WorldScene extends Phaser.Scene {
   /** Layer C on the map: lot interior in the wallet's biome, plot tiles, conviction tree, wither stumps, decor flora. */
   applyLand(view: LotView): void {
     const l = view.lot; const geo = view.geo; const land = l.land;
-    const key = `${land.address}:${land.biome}:${land.treeStage}:${land.witherMarks}:${land.decorFlora}:${l.plotCount}:${!!l.defenses.mud}`;
+    const cos = l.cosmetics ?? { fence: 'wood', lantern: false, nameplate: false, path: false, gnomeHat: -1 };
+    const key = `${land.address}:${land.biome}:${land.treeStage}:${land.witherMarks}:${land.decorFlora}:${l.plotCount}:${!!l.defenses.mud}:${l.defenses.gateHp > 0}:${JSON.stringify(cos)}`;
     if (view.landKey === key) return;
     view.landKey = key;
-    for (const o of view.landObjs) o.destroy(); view.landObjs = [];
-    const b = land.address ? land.biome : this.villageBiome;
-    for (let j = 1; j < geo.h - 1; j++) for (let i = 1; i < geo.w - 1; i++) this.layer.putTileAt(b * 16 + (l.defenses.mud ? T.soil : T.grass2), geo.x + i, geo.y + j);
-    for (let i = 0; i < l.plotCount; i++) this.layer.putTileAt(b * 16 + T.plot, geo.plots[i].tx, geo.plots[i].ty);
+    for (const o of view.landObjs) { this.lamps = this.lamps.filter((x) => x !== o); o.destroy(); } view.landObjs = [];
+    const b = land.address ? land.biome : this.villageBiome; const vb = this.villageBiome * TILE_STRIDE;
+    // fence style (cosmetic), gate, optional cobbled ring, mud
+    const fh = cos.fence === 'stone' ? T.fence_h2 : cos.fence === 'hedge' ? T.hedge : T.fence_h; const fv = cos.fence === 'stone' ? T.fence_v2 : cos.fence === 'hedge' ? T.hedge : T.fence_v;
+    for (let i = 0; i < geo.w; i++) { this.layer.putTileAt(vb + fh, geo.x + i, geo.y); this.layer.putTileAt(vb + fh, geo.x + i, geo.y + geo.h - 1); }
+    for (let j = 0; j < geo.h; j++) { this.layer.putTileAt(vb + fv, geo.x, geo.y + j); this.layer.putTileAt(vb + fv, geo.x + geo.w - 1, geo.y + j); }
+    const stone = cos.fence === 'stone';
+    this.layer.putTileAt(vb + (l.defenses.gateHp > 0 ? (stone ? T.gate_closed2 : T.gate_closed) : (stone ? T.gate_open2 : T.gate_open)), geo.gate.tx, geo.gate.ty);
+    for (let j = 1; j < geo.h - 1; j++) for (let i = 1; i < geo.w - 1; i++) {
+      const ring = cos.path && (i === 1 || j === 1 || i === geo.w - 2 || j === geo.h - 2);
+      this.layer.putTileAt(b * TILE_STRIDE + (ring ? T.cobble2 : l.defenses.mud ? T.soil : T.grass2), geo.x + i, geo.y + j);
+    }
+    for (let i = 0; i < l.plotCount; i++) this.layer.putTileAt(b * TILE_STRIDE + T.plot, geo.plots[i].tx, geo.plots[i].ty);
+    const g = lotGatePx(geo); const side = geo.gateSide === 'left' || geo.gateSide === 'right';
+    if (cos.lantern) for (const d of [-1, 1]) { const lx = side ? g.x : g.x + d * 28; const ly = side ? g.y + d * 28 : g.y; const lamp = this.add.image(lx, ly + 14, 'plaza', 'lamp0').setOrigin(0.5, 1).setDepth(ly + 14).setScale(0.75); this.lamps.push(lamp); view.landObjs.push(lamp); }
+    if (cos.nameplate) view.landObjs.push(this.add.image(g.x + (side ? 0 : 22), g.y + (side ? 22 : 0) + 14, 'plaza', 'sign').setOrigin(0.5, 1).setDepth(g.y + 14));
     if (land.address) {
       const tx = geo.gateSide === 'left' ? geo.x + geo.w - 2 : geo.x + 1; const ty = geo.gateSide === 'top' ? geo.y + geo.h - 2 : geo.y + 1;
       const t = this.add.image(tx * TILE + 16, ty * TILE + 30, 'props', `tree${land.treeStage}`).setOrigin(0.5, 1).setDepth(ty * TILE + 30);
@@ -403,10 +425,11 @@ export class WorldScene extends Phaser.Scene {
       this.player.setPosition(r.x, r.y);
       if (Math.abs(dx) > Math.abs(dy)) { this.dir = 'side'; this.flip = dx < 0; } else this.dir = dy < 0 ? 'up' : 'down';
       this.moving = true;
-      this.player.setFlipX(this.flip).play(this.carrying && this.dir === 'down' ? `walk${this.you!.color}_carry` : `walk${this.you!.color}_${this.dir}`, true);
+      const skin = `${this.you!.color}${this.you!.hat}`;
+      this.player.setFlipX(this.flip).play(this.carrying && this.dir === 'down' ? `walk${skin}_carry` : `walk${skin}_${this.dir}`, true);
     } else {
       this.moving = false;
-      if (this.player.anims.isPlaying) { this.player.stop(); this.player.setFrame(`farmer${this.you!.color}_${this.carrying && this.dir === 'down' ? 'carry' : this.dir}0`); }
+      if (this.player.anims.isPlaying) { this.player.stop(); this.player.setFrame(`farmer${this.you!.color}${this.you!.hat}_${this.carrying && this.dir === 'down' ? 'carry' : this.dir}0`); }
     }
     if (wasMoving !== this.moving) this.player.setData('dirty', true);
     this.player.setDepth(this.player.y);
@@ -420,19 +443,20 @@ export class WorldScene extends Phaser.Scene {
     const k = Math.min(1, dt * 12);
     for (const r of this.remotes.values()) {
       const s = r.sprite; s.x += (r.tx - s.x) * k; s.y += (r.ty - s.y) * k; s.setDepth(s.y);
-      if (r.m) { s.setFlipX(r.f).play(r.carryId && r.d === 'down' ? `walk${r.color}_carry` : `walk${r.color}_${r.d}`, true); }
-      else if (s.anims.isPlaying) { s.stop(); s.setFrame(`farmer${r.color}_${r.carryId && r.d === 'down' ? 'carry' : r.d}0`); }
+      if (r.m) { s.setFlipX(r.f).play(r.carryId && r.d === 'down' ? `walk${r.color}${r.hat}_carry` : `walk${r.color}${r.hat}_${r.d}`, true); }
+      else if (s.anims.isPlaying) { s.stop(); s.setFrame(`farmer${r.color}${r.hat}_${r.carryId && r.d === 'down' ? 'carry' : r.d}0`); }
       r.tag.setPosition(s.x, s.y - 30); r.carry?.setPosition(s.x, s.y - 28).setDepth(s.y + 1);
       this.wanted.get(r.sprite.getData('id') as string)?.setPosition(s.x, s.y - 38);
       if (r.bubble) { r.bubble.setPosition(s.x, s.y - 40); if (now > r.bubbleUntil) { r.bubble.destroy(); r.bubble = null; } }
     }
-    for (const v of this.lots.values()) if (v.gnome) { const a = now / 1500; v.gnome.setPosition(v.geo.center.x + Math.cos(a) * 52, v.geo.center.y + Math.sin(a) * 40).setDepth(v.gnome.y).setFlipX(Math.sin(a) < 0); }
+    for (const v of this.lots.values()) if (v.gnome) { const a = now / 1500; v.gnome.setPosition(v.geo.center.x + Math.cos(a) * 52, v.geo.center.y + Math.sin(a) * 40).setDepth(v.gnome.y).setFlipX(Math.sin(a) < 0); const gh = v.gnome.getData('hat') as Phaser.GameObjects.Image | undefined; gh?.setPosition(v.gnome.x, v.gnome.y - 28).setDepth(v.gnome.y + 1); }
   }
 
   drawOverlays(now: number): void {
     this.highlight.clear();
     const near = this.nearestPlot();
     if (near) { const pos = near.pos; this.highlight.lineStyle(1, near.mine ? (this.selectedSeed && !near.plot ? 0xf0c434 : 0xffffff) : 0xff6060, 0.8); this.highlight.strokeRect(pos.x - 15, pos.y - 15, 31, 31); }
+    if (near?.plot?.nick) this.nickText.setText(`"${near.plot.nick}"`).setPosition(near.pos.x, near.pos.y - 34).setVisible(true); else this.nickText.setVisible(false);
     this.bar.clear();
     if (this.channel) {
       const f = Math.min(1, (now - this.channel.start) / this.channel.dur);
@@ -546,6 +570,9 @@ export class WorldScene extends Phaser.Scene {
     if (!this.you!.plots.some((p) => !p)) { sfx.deny(); this.hud.toast(COPY.noFreePlot); return; }
     this.selectedSeed = uid; this.hud.close(); this.hud.toast(COPY.plantPrompt, 4000);
   }
+  cosmetic(item: P.CosmeticItem): void { this.net.send({ t: 'cosmetic', item }); sfx.buy(); }
+  wardrobe(shirt?: number, hat?: number): void { this.net.send({ t: 'wardrobe', shirt, hat }); sfx.buy(); }
+  nick(plotId: number, name: string): void { this.net.send({ t: 'nick', plotId, name }); }
   visit(villageId: string): void { this.net.send({ t: 'visit', village: villageId }); this.hud.close(); }
   goHome(): void { this.net.send({ t: 'home' }); this.hud.close(); }
   postBounty(thiefId: string, amount: number): void { this.net.send({ t: 'bounty', thiefId, amount }); }

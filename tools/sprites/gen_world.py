@@ -5,7 +5,9 @@ from gen import Canvas, PAL, tile as base_tile, eye, farmer as base_farmer, gnom
 
 # Tile order is the tilemap index. MUST match shared/world.ts TILE list.
 TILE_ORDER = ['grass', 'grass2', 'soil', 'plot', 'path', 'hedge', 'water', 'stone',
-              'flowers', 'cobble', 'fence_h', 'fence_v', 'gate_open', 'gate_closed', 'grass3', 'water2']
+              'flowers', 'cobble', 'fence_h', 'fence_v', 'gate_open', 'gate_closed', 'grass3', 'water2',
+              'fence_h2', 'fence_v2', 'gate_open2', 'gate_closed2', 'cobble2']
+TILE_STRIDE = 32  # tiles per packed row; gid = biome * TILE_STRIDE + tile (shared/world.ts)
 
 # biome id -> remap of the green family (+ optional flower colours). Names are cosmetic copy (I-9: abstract only).
 BIOMES = [
@@ -52,6 +54,25 @@ def tile(kind, seed=1):
         else:
             cv.rect(2, 8, 4, 20, 'B'); cv.rect(26, 8, 4, 20, 'B'); cv.rect(2, 8, 4, 1, 'b'); cv.rect(26, 8, 4, 1, 'b')
             for y in range(14, 26, 3): cv.set(15, y, 'E'); cv.set(16, y, 'E')  # trodden gap
+    elif kind in ('fence_h2', 'fence_v2', 'gate_open2', 'gate_closed2'):
+        cv = base_tile('grass', seed + 70)
+        if kind == 'fence_h2':
+            cv.rect(0, 10, 32, 14, 's'); cv.rect(0, 10, 32, 1, 'W'); cv.rect(0, 23, 32, 1, 'S')
+            for y in (14, 19): cv.rect(0, y, 32, 1, 'S')
+            for x in range(2, 32, 8): cv.set(x, 16, 'S'); cv.set(x + 4, 21, 'S')
+        elif kind == 'fence_v2':
+            cv.rect(11, 0, 10, 32, 's'); cv.rect(11, 0, 1, 32, 'W'); cv.rect(20, 0, 1, 32, 'S')
+            for y in range(3, 32, 6): cv.rect(12, y, 8, 1, 'S')
+        else:
+            cv.rect(2, 6, 5, 22, 's'); cv.rect(25, 6, 5, 22, 's'); cv.rect(2, 6, 5, 1, 'W'); cv.rect(25, 6, 5, 1, 'W')
+            if kind == 'gate_closed2':
+                for x in range(8, 25, 4): cv.rect(x, 10, 1, 16, 'S')
+                cv.rect(7, 12, 18, 1, 'S'); cv.rect(7, 22, 18, 1, 'S')
+    elif kind == 'cobble2':
+        cv.rect(0, 0, 32, 32, 'b')
+        for y in range(0, 32, 8):
+            for x in range(0, 32, 8):
+                cv.rect(x + 1 + (y // 8 % 2) * 2, y + 1, 5, 5, 'E'); cv.set(x + 2 + (y // 8 % 2) * 2, y + 2, 'e')
     elif kind == 'fence_v':
         cv = base_tile('grass', seed + 61)
         cv.rect(14, 0, 4, 32, 'b'); cv.rect(13, 2, 6, 4, 'B'); cv.rect(13, 26, 6, 4, 'B'); cv.rect(12, 14, 8, 3, 'B')
@@ -104,8 +125,8 @@ def plaza(kind):
     cv.outline(); return cv
 
 
-def farmer(direction, frame, carry=False, shirt='C'):
-    cv = base_farmer(direction, frame, carry)
+def farmer(direction, frame, carry=False, shirt='C', hat=0):
+    cv = base_farmer(direction, frame, carry, hat)
     return remapped(cv, {'C': shirt}) if shirt != 'C' else cv
 
 
@@ -124,15 +145,16 @@ SHIRTS = ['C', 'r', 'G', 'P', 'o', 't']
 def build(out):
     base = [(k, tile(k, i + 1)) for i, k in enumerate(TILE_ORDER)]
     for bi, (name, mp) in enumerate(BIOMES):
-        pack([(k, remapped(cv, mp)) for k, cv in base], 32, 32, 16, f'tiles_b{bi}', out)
+        pack([(k, remapped(cv, mp)) for k, cv in base], 32, 32, TILE_STRIDE, f'tiles_b{bi}', out)
     chars = []
     for v, shirt in enumerate(SHIRTS):
-        for d in ('down', 'up', 'side'):
-            for fr in range(2): chars.append((f"farmer{v}_{d}{fr}", farmer(d, fr, shirt=shirt)))
-        for fr in range(2): chars.append((f"farmer{v}_carry{fr}", farmer('down', fr, carry=True, shirt=shirt)))
+        for h in range(4):
+            for d in ('down', 'up', 'side'):
+                for fr in range(2): chars.append((f"farmer{v}{h}_{d}{fr}", farmer(d, fr, shirt=shirt, hat=h)))
+            for fr in range(2): chars.append((f"farmer{v}{h}_carry{fr}", farmer('down', fr, carry=True, shirt=shirt, hat=h)))
     for fr in range(3): chars.append((f"gnome{fr}", gnome(fr)))
     for fr in range(2): chars.append((f"npc{fr}", npc(fr)))
-    pack(chars, 32, 32, 8, 'chars', out)
+    pack(chars, 32, 32, 16, 'chars', out)
     pk = [(k, plaza(k)) for k in ('fountain0', 'fountain1', 'lamp0', 'lamp1', 'bench', 'board', 'stall', 'sign', 'track', 'pot')] + [(f'decor{i}', decor(i)) for i in range(3)] + [('weeds', weeds())]
     pack(pk, 64, 64, 5, 'plaza', out)
     return len(base), len(BIOMES), len(chars), len(pk)

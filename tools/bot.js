@@ -146,6 +146,17 @@ class Bot {
   carol.send({ t: 'home' }); await sleep(600);
   check(welcomes[1] === carol.you.villageId && carol.you.visiting === null, 'Carol went home');
   carol.ws.close();
+  // phase three: cosmetics, wardrobe, nickname, trophies
+  bob.send({ t: 'cosmetic', item: 'nameplate' }); await sleep(300);
+  check(bob.you.cosmetics.nameplate === true || bob.you.sap < 150, `bought nameplate (sap=${Math.round(bob.you.sap)})`);
+  bob.send({ t: 'wardrobe', hat: 1 }); await sleep(300);
+  check(bob.you.hat === 1 || bob.you.sap < 200, `wearing the cap (hat=${bob.you.hat})`);
+  const bp = bob.you.plots.findIndex((p) => p); bob.send({ t: 'nick', plotId: bp, name: 'Gerald' }); await sleep(400);
+  const bobLotSeen = alice.lots.get(bob.id);
+  check(bob.you.plots[bp].nick === 'Gerald' && bobLotSeen && bobLotSeen.plots.some((p) => p.nick === 'Gerald'), 'nickname set and visible to Alice');
+  let board = null; const origOnA3 = alice.on.bind(alice); alice.on = (m) => { if (m.t === 'board') board = m; origOnA3(m); };
+  alice.send({ t: 'villages' }); alice.send({ t: 'sprint' }); await sleep(500);
+  check(bob.you.weekly && bob.you.weekly.steals >= 1, `weekly trophies count Bob's steal (${bob.you.weekly && bob.you.weekly.steals})`);
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS');
   alice.ws.close(); bob.ws.close(); process.exit(fails.length ? 1 : 0);
 })();

@@ -12,10 +12,12 @@ export const MAX_PLOTS = 20;
 
 // MUST match tools/sprites/gen_world.py TILE_ORDER
 export const TILES = ['grass', 'grass2', 'soil', 'plot', 'path', 'hedge', 'water', 'stone',
-  'flowers', 'cobble', 'fence_h', 'fence_v', 'gate_open', 'gate_closed', 'grass3', 'water2'] as const;
+  'flowers', 'cobble', 'fence_h', 'fence_v', 'gate_open', 'gate_closed', 'grass3', 'water2',
+  'fence_h2', 'fence_v2', 'gate_open2', 'gate_closed2', 'cobble2'] as const;
+export const TILE_STRIDE = 32;   // tiles per biome row in the packed strip (gid = biome * TILE_STRIDE + tile)
 export type TileKind = typeof TILES[number];
 export const T: Record<TileKind, number> = Object.fromEntries(TILES.map((k, i) => [k, i])) as Record<TileKind, number>;
-const BLOCKED = new Set<number>([T.hedge, T.water, T.water2, T.fence_h, T.fence_v, T.gate_closed]);
+const BLOCKED = new Set<number>([T.hedge, T.water, T.water2, T.fence_h, T.fence_v, T.gate_closed, T.fence_h2, T.fence_v2, T.gate_closed2]);
 
 export const BIOME_NAMES = ['Verdant Rows', 'Molten Meadow', 'Static Bog', 'Sugar Hollow', 'Dusk Flats', 'Frost Ridge', 'Ash Yard', 'Neon Marsh'];
 
@@ -147,7 +149,7 @@ export function tileAt(v: Village, tx: number, ty: number): number {
 }
 export function isWalkableTile(v: Village, tx: number, ty: number, gateClosed: (tx: number, ty: number) => boolean): boolean {
   const t = tileAt(v, tx, ty);
-  if (t === T.gate_open && gateClosed(tx, ty)) return false;
+  if ((t === T.gate_open || t === T.gate_open2) && gateClosed(tx, ty)) return false;
   if (BLOCKED.has(t)) return false;
   for (const p of v.props) if (p.solid && tx >= p.tx && tx < p.tx + p.w && ty >= p.ty && ty < p.ty + p.h) return false;
   return true;

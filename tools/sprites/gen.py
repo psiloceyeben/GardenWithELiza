@@ -495,7 +495,20 @@ def tile(kind, seed=1):
 
 
 # ---------------------------------------------------------------- characters
-def farmer(direction, frame, carry=False):
+def hat_draw(cv, hat, bob, side):
+    """0 straw, 1 cap, 2 top hat, 3 bandana"""
+    if hat == 0:
+        if side: cv.rect(11, 6 + bob, 11, 2, 'y'); cv.rect(13, 3 + bob, 7, 3, 'y')
+        else: cv.rect(10, 6 + bob, 12, 2, 'y'); cv.rect(12, 3 + bob, 8, 3, 'y'); cv.rect(12, 5 + bob, 8, 1, '2')
+    elif hat == 1:
+        cv.rect(12, 4 + bob, 8, 4, 'C'); cv.rect(17 if side else 10, 7 + bob, 5 if side else 6, 1, 'n')
+    elif hat == 2:
+        cv.rect(12, 0 + bob, 8, 7, 'K'); cv.rect(10, 7 + bob, 12, 1, 'K'); cv.rect(12, 5 + bob, 8, 1, 'r')
+    else:
+        cv.rect(12, 4 + bob, 8, 2, 'D'); cv.rect(12, 6 + bob, 8, 2, 'r'); cv.rect(19, 7 + bob, 3, 2, 'r')
+
+
+def farmer(direction, frame, carry=False, hat=0):
     cv = Canvas(32, 32); leg = frame % 2; bob = -1 if leg else 0
     def body(narrow):
         bw = 6 if narrow else 10; bx = 16 - bw // 2
@@ -510,13 +523,13 @@ def farmer(direction, frame, carry=False):
             cv.rect(9, 14 + bob, 2, 6, 'C'); cv.rect(21, 14 + bob, 2, 6, 'C'); cv.rect(9, 20 + bob, 2, 2, 'e'); cv.rect(21, 20 + bob, 2, 2, 'e')
         cv.rect(12, 8 + bob, 8, 6, 'e' if direction == 'down' else 'D')
         if direction == 'down': eye(cv, 13, 10 + bob); eye(cv, 17, 10 + bob); cv.rect(15, 13 + bob, 2, 1, 'K')
-        cv.rect(10, 6 + bob, 12, 2, 'y'); cv.rect(12, 3 + bob, 8, 3, 'y'); cv.rect(12, 5 + bob, 8, 1, '2')
+        hat_draw(cv, hat, bob, False)
     else:
         body(True)
         ax = 18 if not carry else 16
         cv.rect(ax, (14 if not carry else 7) + bob, 2, 7, 'C'); cv.rect(ax, (21 if not carry else 5) + bob, 2, 2, 'e')
         cv.rect(13, 8 + bob, 7, 6, 'e'); eye(cv, 17, 10 + bob); cv.rect(18, 13 + bob, 2, 1, 'K')
-        cv.rect(11, 6 + bob, 11, 2, 'y'); cv.rect(13, 3 + bob, 7, 3, 'y')
+        hat_draw(cv, hat, bob, True)
     cv.outline(); return cv
 
 
@@ -598,6 +611,12 @@ def ui(kind):
         cv.rect(7, 2, 2, 12, 'Y'); cv.rect(2, 7, 12, 2, 'Y'); cv.rect(6, 6, 4, 4, 'w')
     elif kind == 'lockicon':
         cv.rect(4, 7, 8, 7, '1'); cv.rect(5, 3, 1, 4, 's'); cv.rect(10, 3, 1, 4, 's'); cv.rect(5, 3, 6, 1, 's'); cv.set(8, 10, 'K')
+    elif kind == 'ghat0':  # gnome wizard hat
+        cv.tri_up(8, 12, 6, 10, 'P'); cv.rect(2, 12, 12, 2, 'v'); cv.rect(7, 6, 2, 2, 'Y'); cv.set(10, 9, 'Y')
+    elif kind == 'ghat1':  # gnome crown
+        cv.rect(3, 8, 10, 5, '1'); cv.rect(3, 6, 2, 2, '1'); cv.rect(7, 5, 2, 3, '1'); cv.rect(11, 6, 2, 2, '1'); cv.set(8, 10, 'r'); cv.set(5, 10, 'C'); cv.set(11, 10, 'C')
+    elif kind == 'ghat2':  # gnome propeller
+        cv.ellipse(8, 11, 5, 3, 'r'); cv.rect(7, 7, 2, 3, 'S'); cv.rect(2, 6, 12, 1, 'w'); cv.rect(7, 4, 2, 2, 'w')
     return cv
 
 
@@ -638,7 +657,7 @@ def main(out):
     props += [(f"tree{s}", tree(s)) for s in range(5)]
     pack(props, 48, 64, 9, 'props', out)
 
-    pack([(k, ui(k)) for k in ('panel9', 'sap', 'seed', 'sparkle', 'lockicon')], 24, 24, 5, 'ui', out)
+    pack([(k, ui(k)) for k in ('panel9', 'sap', 'seed', 'sparkle', 'lockicon', 'ghat0', 'ghat1', 'ghat2')], 24, 24, 8, 'ui', out)
 
     # preview contact sheet: idle0 + grow2 + wither0 for every species, 3x
     pv = Image.new('RGBA', (32 * 20, 48 * 4), (40, 30, 50, 255))

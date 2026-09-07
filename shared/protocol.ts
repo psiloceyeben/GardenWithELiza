@@ -14,11 +14,23 @@ export interface Defenses {
 }
 
 export interface Bounty { thiefId: string; thiefName: string; byName: string; amount: number; until: number; }
+
+/** Phase three: cosmetics are Sap sinks with zero gameplay effect. */
+export type FenceStyle = 'wood' | 'stone' | 'hedge';
+export interface Cosmetics { fence: FenceStyle; lantern: boolean; nameplate: boolean; path: boolean; gnomeHat: number; }   // gnomeHat -1 = none
+export type CosmeticItem = 'fence_stone' | 'fence_hedge' | 'fence_wood' | 'lantern' | 'nameplate' | 'path' | 'ghat0' | 'ghat1' | 'ghat2';
+export const COSMETIC_PRICES: Record<CosmeticItem, number> = { fence_stone: 600, fence_hedge: 400, fence_wood: 0, lantern: 250, nameplate: 150, path: 300, ghat0: 200, ghat1: 350, ghat2: 200 };
+export const HAT_PRICES = [0, 200, 800, 300];     // straw, cap, top hat, bandana
+export const SHIRT_PRICE = 50;
+export const HAT_COUNT = 4;
+export interface Weekly { week: string; steals: number; tags: number; heistTier: number; heistSpecies: string; }
+export interface Trophies { week: string; steals: { name: string; n: number }[]; tags: { name: string; n: number }[]; heists: { name: string; species: string; tier: Tier }[]; }
+export interface NameEntry { name: string; color: number; hat: number; }
 export interface VillageInfo { id: string; name: string; online: number; free: number; }
 export interface Thief { id: string; name: string; at: number; }
 
 /** What everyone in the village may see about a lot. */
-export interface PublicPlot { i: number; speciesId: string; tier: Tier; revealed: boolean; size: number; mutation: MutationId; lockedUntil: number; weedy: boolean; }
+export interface PublicPlot { i: number; speciesId: string; tier: Tier; revealed: boolean; size: number; mutation: MutationId; lockedUntil: number; weedy: boolean; nick?: string; }
 
 /** Wild seed on the village grounds (phase one: foraging). */
 export interface Wild { id: string; x: number; y: number; speciesId: string; tier: Tier; until: number; }
@@ -36,6 +48,7 @@ export interface PublicLot {
   plots: PublicPlot[];
   defenses: Defenses;
   land: LandView;
+  cosmetics: Cosmetics;
 }
 
 /** Layer C as rendered on a lot: derived, permanent, unstealable. */
@@ -61,6 +74,9 @@ export interface PrivateState {
   land: LandView;
   visiting: string | null;   // village id when away from home
   stolenBy: Thief[];         // who robbed you in the last hour (bounty targets)
+  cosmetics: Cosmetics;
+  hat: number;
+  weekly: Weekly;
 }
 
 export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; b?: boolean; }
@@ -87,6 +103,9 @@ export type ClientMsg =
   | { t: 'visit'; village: string }
   | { t: 'home' }
   | { t: 'villages' }
+  | { t: 'cosmetic'; item: CosmeticItem }
+  | { t: 'wardrobe'; shirt?: number; hat?: number }
+  | { t: 'nick'; plotId: number; name: string }
   | { t: 'ping'; n: number };
 
 export type ShopItem = 'train' | 'fence' | 'repair' | 'gnome' | 'sprinkler' | 'lock' | 'scarecrow' | 'mud' | 'bell';
@@ -94,12 +113,12 @@ export type ShopItem = 'train' | 'fence' | 'repair' | 'gnome' | 'sprinkler' | 'l
 export interface FeedEvent { at: number; kind: 'steal' | 'tag' | 'gate' | 'reveal' | 'join' | 'uproot' | 'break'; text: string; }
 
 export type ServerMsg =
-  | { t: 'welcome'; you: PrivateState; village: { id: string; seed: number; biome: number; name: string }; lots: PublicLot[]; players: SnapPlayer[]; names: Record<string, { name: string; color: number }>; feed: FeedEvent[]; now: number; villages: VillageInfo[] }
+  | { t: 'welcome'; you: PrivateState; village: { id: string; seed: number; biome: number; name: string }; lots: PublicLot[]; players: SnapPlayer[]; names: Record<string, NameEntry>; feed: FeedEvent[]; now: number; villages: VillageInfo[] }
   | { t: 'villages'; list: VillageInfo[] }
   | { t: 'snap'; now: number; p: SnapPlayer[] }
   | { t: 'state'; you: Partial<PrivateState> }
   | { t: 'lot'; lot: PublicLot }
-  | { t: 'players'; names: Record<string, { name: string; color: number }>; left?: string[] }
+  | { t: 'players'; names: Record<string, NameEntry>; left?: string[] }
   | { t: 'feed'; e: FeedEvent }
   | { t: 'reveal'; plant: Plant }
   | { t: 'toast'; text: string }
@@ -113,7 +132,7 @@ export type ServerMsg =
   | { t: 'wild'; add?: Wild[]; remove?: string[]; all?: Wild[] }
   | { t: 'event'; ev: VillageEvent | null }
   | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }
-  | { t: 'board'; sprint: SprintEntry[]; bounties?: Bounty[] }
+  | { t: 'board'; sprint: SprintEntry[]; bounties?: Bounty[]; trophies?: Trophies }
   | { t: 'pong'; n: number; now: number };
 
 // Phase one [TUNABLE]
