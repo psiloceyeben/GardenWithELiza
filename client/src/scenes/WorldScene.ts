@@ -67,6 +67,10 @@ export class WorldScene extends Phaser.Scene {
   board: P.SprintEntry[] = [];
   sprintStartedAt = 0;
   lastSecond = 0; lastStep = 0;
+  villageId = '';
+  villages: P.VillageInfo[] = [];
+  bounties: P.Bounty[] = [];
+  wanted = new Map<string, Phaser.GameObjects.Text>();
 
   constructor() { super('world'); }
 
@@ -137,7 +141,9 @@ export class WorldScene extends Phaser.Scene {
   onMsg(m: ServerMsg): void {
     switch (m.t) {
       case 'welcome': {
+        if (this.village && m.village.id !== this.villageId) { this.net.close(); location.reload(); return; }
         if (!this.village) { this.buildWorld(m.village.seed, m.village.biome); }
+        this.villageId = m.village.id; this.villages = m.villages;
         this.you = m.you; this.villageName = m.village.name; this.feed = m.feed;
         for (const [id, n] of Object.entries(m.names)) this.names.set(id, n);
         for (const l of m.lots) this.applyLot(l);
@@ -151,8 +157,8 @@ export class WorldScene extends Phaser.Scene {
       }
       case 'snap': {
         const seen = new Set<string>();
-        for (const p of m.p) { seen.add(p.id); if (p.id === this.you?.id) { if (Math.hypot(p.x - this.player.x, p.y - this.player.y) > 48) this.player.setPosition(p.x, p.y); } else this.applySnap(p); }
-        for (const [id, r] of this.remotes) if (!seen.has(id)) { this.destroyRemote(r); this.remotes.delete(id); }
+        for (const p of m.p) { seen.add(p.id); if (p.id === this.you?.id) { if (Math.hypot(p.x - this.player.x, p.y - this.player.y) > 48) this.player.setPosition(p.x, p.y); } else this.applySnap(p); this.setWanted(p.id, !!p.b); }
+        for (const [id, r] of this.remotes) if (!seen.has(id)) { this.destroyRemote(r); this.remotes.delete(id); this.setWanted(id, false); }
         break;
       }
       case 'state': if (this.you) { Object.assign(this.you, m.you); this.hud.refresh(); } break;
@@ -173,7 +179,8 @@ export class WorldScene extends Phaser.Scene {
         break;
       }
       case 'event': this.event = m.ev; this.hud.banner(Date.now()); if (m.ev?.kind === 'screaming_hour') this.screamingHour(); break;
-      case 'board': this.board = m.sprint; this.hud.refresh(); break;
+      case 'board': this.board = m.sprint; if (m.bounties) this.bounties = m.bounties; this.hud.refresh(); break;
+      case 'villages': this.villages = m.list; this.hud.refresh(); break;
       case 'sprint':
         if (m.phase === 'start') { this.sprintStartedAt = Date.now(); this.hud.toast(COPY.sprintStart, 3000); sfx.buy(); }
         else if (m.phase === 'turn') { this.hud.toast(COPY.sprintTurn, 2000); sfx.tend(); }
@@ -190,7 +197,7 @@ export class WorldScene extends Phaser.Scene {
     let r = this.remotes.get(p.id);
     const n = this.names.get(p.id) ?? { name: '?', color: 0 };
     if (!r) {
-      const sprite = this.add.sprite(p.x, p.y, 'chars', `farmer${n.color}_down0`).setOrigin(0.5, 30 / 32).setDepth(p.y);
+      const sprite = this.add.sprite(p.x, p.y, 'chars', `farmer${n.color}_down0`).setOrigin(0.5, 30 / 32).setDepth(p.y).setData('id', p.id);
       r = { sprite, tag: this.makeTag(n.name, n.color), tx: p.x, ty: p.y, d: p.d, f: p.f, m: p.m, carry: null, carryId: '', bubble: null, bubbleUntil: 0, color: n.color };
       this.remotes.set(p.id, r);
     }
@@ -199,6 +206,12 @@ export class WorldScene extends Phaser.Scene {
   }
 
   destroyRemote(r: Remote): void { r.sprite.destroy(); r.tag.destroy(); r.carry?.destroy(); r.bubble?.destroy(); }
+
+  setWanted(id: string, on: boolean): void {
+    const cur = this.wanted.get(id);
+    if (on && !cur) this.wanted.set(id, this.add.text(0, 0, COPY.wanted, { fontFamily: '"Press Start 2P", monospace', fontSize: '6px', color: '#ff5555', stroke: '#000', strokeThickness: 2, resolution: 3 }).setOrigin(0.5, 1).setDepth(8001));
+    else if (!on && cur) { cur.destroy(); this.wanted.delete(id); }
+  }
 
   setCarry(host: Phaser.GameObjects.Sprite, cur: Phaser.GameObjects.Image | null, speciesId: string | null, set: (i: Phaser.GameObjects.Image | null) => void): void {
     cur?.destroy();
@@ -286,12 +299,12 @@ export class WorldScene extends Phaser.Scene {
   /** Layer C on the map: lot interior in the wallet's biome, plot tiles, conviction tree, wither stumps, decor flora. */
   applyLand(view: LotView): void {
     const l = view.lot; const geo = view.geo; const land = l.land;
-    const key = `${land.address}:${land.biome}:${land.treeStage}:${land.witherMarks}:${land.decorFlora}:${l.plotCount}`;
+    const key = `${land.address}:${land.biome}:${land.treeStage}:${land.witherMarks}:${land.decorFlora}:${l.plotCount}:${!!l.defenses.mud}`;
     if (view.landKey === key) return;
     view.landKey = key;
     for (const o of view.landObjs) o.destroy(); view.landObjs = [];
     const b = land.address ? land.biome : this.villageBiome;
-    for (let j = 1; j < geo.h - 1; j++) for (let i = 1; i < geo.w - 1; i++) this.layer.putTileAt(b * 16 + T.grass2, geo.x + i, geo.y + j);
+    for (let j = 1; j < geo.h - 1; j++) for (let i = 1; i < geo.w - 1; i++) this.layer.putTileAt(b * 16 + (l.defenses.mud ? T.soil : T.grass2), geo.x + i, geo.y + j);
     for (let i = 0; i < l.plotCount; i++) this.layer.putTileAt(b * 16 + T.plot, geo.plots[i].tx, geo.plots[i].ty);
     if (land.address) {
       const tx = geo.gateSide === 'left' ? geo.x + geo.w - 2 : geo.x + 1; const ty = geo.gateSide === 'top' ? geo.y + geo.h - 2 : geo.y + 1;
@@ -398,6 +411,7 @@ export class WorldScene extends Phaser.Scene {
     if (wasMoving !== this.moving) this.player.setData('dirty', true);
     this.player.setDepth(this.player.y);
     this.myTag.setPosition(this.player.x, this.player.y - 30);
+    this.wanted.get(this.you!.id)?.setPosition(this.player.x, this.player.y - 38);
     this.myCarry?.setPosition(this.player.x, this.player.y - 28).setDepth(this.player.y + 1);
     if (this.myBubble) { this.myBubble.setPosition(this.player.x, this.player.y - 40); if (now > this.myBubbleUntil) { this.myBubble.destroy(); this.myBubble = null; } }
   }
@@ -409,6 +423,7 @@ export class WorldScene extends Phaser.Scene {
       if (r.m) { s.setFlipX(r.f).play(r.carryId && r.d === 'down' ? `walk${r.color}_carry` : `walk${r.color}_${r.d}`, true); }
       else if (s.anims.isPlaying) { s.stop(); s.setFrame(`farmer${r.color}_${r.carryId && r.d === 'down' ? 'carry' : r.d}0`); }
       r.tag.setPosition(s.x, s.y - 30); r.carry?.setPosition(s.x, s.y - 28).setDepth(s.y + 1);
+      this.wanted.get(r.sprite.getData('id') as string)?.setPosition(s.x, s.y - 38);
       if (r.bubble) { r.bubble.setPosition(s.x, s.y - 40); if (now > r.bubbleUntil) { r.bubble.destroy(); r.bubble = null; } }
     }
     for (const v of this.lots.values()) if (v.gnome) { const a = now / 1500; v.gnome.setPosition(v.geo.center.x + Math.cos(a) * 52, v.geo.center.y + Math.sin(a) * 40).setDepth(v.gnome.y).setFlipX(Math.sin(a) < 0); }
@@ -485,6 +500,8 @@ export class WorldScene extends Phaser.Scene {
     const v = this.village!;
     if (Math.abs(x - (v.conveyor.tx * TILE + 32)) < 40 && Math.abs(y - (v.conveyor.ty * TILE)) < 32) { this.hud.open('conveyor'); return; }
     if (Math.abs(x - (v.board.tx * TILE + 32)) < 36 && Math.abs(y - (v.board.ty * TILE)) < 32) { this.hud.open('feed'); return; }
+    const sign = v.props.find((p) => p.kind === 'sign');
+    if (sign && Math.abs(x - (sign.tx * TILE + 16)) < 20 && Math.abs(y - (sign.ty * TILE + 16)) < 24) { if (this.you?.visiting) this.goHome(); else this.hud.open('villages'); return; }
     const tr = { x: v.track.tx * TILE + 32, y: v.track.ty * TILE + 16 };
     if (Math.abs(x - tr.x) < 36 && Math.abs(y - tr.y) < 20) { const act = () => this.net.send({ t: 'sprint' }); if (Math.hypot(tr.x - this.player.x, tr.y - this.player.y) < 48) act(); else this.goTo({ x: tr.x, y: tr.y + 6 }, act); return; }
     this.goTo({ x, y });
@@ -529,7 +546,11 @@ export class WorldScene extends Phaser.Scene {
     if (!this.you!.plots.some((p) => !p)) { sfx.deny(); this.hud.toast(COPY.noFreePlot); return; }
     this.selectedSeed = uid; this.hud.close(); this.hud.toast(COPY.plantPrompt, 4000);
   }
-  shop(item: 'train' | 'fence' | 'repair' | 'gnome' | 'sprinkler' | 'lock'): void {
+  visit(villageId: string): void { this.net.send({ t: 'visit', village: villageId }); this.hud.close(); }
+  goHome(): void { this.net.send({ t: 'home' }); this.hud.close(); }
+  postBounty(thiefId: string, amount: number): void { this.net.send({ t: 'bounty', thiefId, amount }); }
+  refreshVillages(): void { this.net.send({ t: 'villages' }); }
+  shop(item: P.ShopItem): void {
     if (item === 'lock') { this.lockMode = true; this.hud.close(); this.hud.toast(COPY.defLockDesc, 4000); return; }
     this.net.send({ t: 'shop', item });
   }

@@ -33,8 +33,11 @@ export interface PlayerRec {
   stolenLog: number[];
   address?: string | null;      // linked wallet (proved by signature); null/undefined = guest
   garden?: GardenSpec | null;   // Layer C, derived; re-derived on every link
+  visiting?: string | null;     // village id while away from home
+  stolenBy?: P.Thief[];         // who robbed me in the last hour (bounty targets)
 }
-export interface VillageRec { id: string; seed: number; lots: (string | null)[]; n: number; sprint?: P.SprintEntry[]; }
+export interface VillageRec { id: string; seed: number; lots: (string | null)[]; n: number; sprint?: P.SprintEntry[]; bounties?: P.Bounty[]; }
+const LOT_CAP = Math.min(LOTS_PER_VILLAGE, Number(process.env.PONS_LOT_CAP ?? LOTS_PER_VILLAGE));
 
 interface Live {
   id: string; ws: WebSocket; x: number; y: number; d: Dir; f: boolean; m: boolean;
@@ -42,6 +45,7 @@ interface Live {
   channel: { kind: 'uproot' | 'break'; target: string; plotId: number; startedAt: number; endsAt: number; sx: number; sy: number } | null;
   shieldUntil: number; lastInputAt: number; lastChatAt: number; connectedAt: number;
   nonce: { value: string; address: string; issuedAt: string; at: number } | null;
+  lastLot: number;
 }
 
 export class Game {
@@ -67,15 +71,22 @@ export class Game {
   sendTo(id: string, m: ServerMsg): void { const l = this.live.get(id); if (l) this.send(l.ws, m); }
   broadcast(villageId: string, m: ServerMsg, except?: string): void {
     const s = JSON.stringify(m);
-    for (const l of this.live.values()) if (l.id !== except && this.players.get(l.id)?.villageId === villageId && l.ws.readyState === l.ws.OPEN) l.ws.send(s);
+    for (const l of this.live.values()) { const r = this.players.get(l.id); if (r && l.id !== except && this.vid(r) === villageId && l.ws.readyState === l.ws.OPEN) l.ws.send(s); }
+  }
+  /** The village a player is currently standing in (home unless visiting). */
+  vid(rec: PlayerRec): string { return rec.visiting ?? rec.villageId; }
+  homeMap(rec: PlayerRec): Village { return this.maps.get(rec.villageId)!; }
+  villageName(id: string): string { const v = this.villages.get(id)!; const m = this.maps.get(id)!; return `${BIOME_NAMES[m.biome]} #${v.n}`; }
+  villageList(): P.VillageInfo[] {
+    return [...this.villages.values()].map((v) => ({ id: v.id, name: this.villageName(v.id), online: [...this.live.values()].filter((l) => this.vid(this.players.get(l.id)!) === v.id).length, free: v.lots.filter((x) => !x).length }));
   }
   feed(villageId: string, kind: FeedEvent['kind'], text: string): void {
     const e: FeedEvent = { at: Date.now(), kind, text };
     const f = this.feeds.get(villageId) ?? []; f.unshift(e); if (f.length > 40) f.length = 40; this.feeds.set(villageId, f);
     this.broadcast(villageId, { t: 'feed', e });
   }
-  map(rec: PlayerRec): Village { return this.maps.get(rec.villageId)!; }
-  lot(rec: PlayerRec): Lot { return this.map(rec).lots[rec.lotId]; }
+  map(rec: PlayerRec): Village { return this.maps.get(this.vid(rec))!; }
+  lot(rec: PlayerRec): Lot { return this.homeMap(rec).lots[rec.lotId]; }
   isShielded(rec: PlayerRec, now: number): boolean { const l = this.live.get(rec.id); return !l || now < l.shieldUntil; }
   gateClosedFn(villageId: string): (tx: number, ty: number) => boolean {
     const v = this.villages.get(villageId)!; const m = this.maps.get(villageId)!;
@@ -89,11 +100,11 @@ export class Game {
   }
   speedOf(l: Live, rec: PlayerRec, now: number): number {
     let s = P.BASE_SPEED * E.speedMult(rec.speedLevel);
-    if (l.carry) {
-      s *= P.CARRY_SPEED;
-      const inLot = lotAtPx(this.map(rec), l.x, l.y);
-      if (inLot) { const owner = this.ownerOfLot(rec.villageId, inLot.id); if (owner && owner.id !== rec.id && owner.defenses.sprinkler) s *= P.SPRINKLER_SPEED; }
-    }
+    const inLot = lotAtPx(this.map(rec), l.x, l.y);
+    const owner = inLot ? this.ownerOfLot(this.vid(rec), inLot.id) : null;
+    const foreign = !!owner && owner.id !== rec.id;
+    if (foreign && owner!.defenses.mud) s *= P.MUD_SPEED;
+    if (l.carry) { s *= P.CARRY_SPEED; if (foreign && owner!.defenses.sprinkler) s *= P.SPRINKLER_SPEED; }
     return s;
   }
   ownerOfLot(villageId: string, lotId: number): PlayerRec | null {
@@ -106,30 +117,40 @@ export class Game {
 
   landView(rec: PlayerRec): P.LandView {
     const g = rec.garden ?? null;
-    return { address: rec.address ?? null, biome: g ? g.biome : this.map(rec).biome, treeStage: g ? g.treeStage : 0, witherMarks: g ? g.witherMarks : 0, decorFlora: g ? g.decorFlora : 0, hybrids: g ? g.hybridsUnlocked : false };
+    return { address: rec.address ?? null, biome: g ? g.biome : this.homeMap(rec).biome, treeStage: g ? g.treeStage : 0, witherMarks: g ? g.witherMarks : 0, decorFlora: g ? g.decorFlora : 0, hybrids: g ? g.hybridsUnlocked : false };
   }
   privateState(rec: PlayerRec): PrivateState {
-    return { id: rec.id, name: rec.name, color: rec.color, sap: rec.sap, seeds: rec.seeds, plots: rec.plots, plotCount: rec.plotCount, conveyor: rec.conveyor, speedLevel: rec.speedLevel, rarityFloor: rec.rarityFloor, defenses: rec.defenses, lotId: rec.lotId, villageId: rec.villageId, stats: rec.stats, lockedUntil: rec.lockedUntil, land: this.landView(rec) };
+    return { id: rec.id, name: rec.name, color: rec.color, sap: rec.sap, seeds: rec.seeds, plots: rec.plots, plotCount: rec.plotCount, conveyor: rec.conveyor, speedLevel: rec.speedLevel, rarityFloor: rec.rarityFloor, defenses: rec.defenses, lotId: rec.lotId, villageId: rec.villageId, stats: rec.stats, lockedUntil: rec.lockedUntil, land: this.landView(rec), visiting: rec.visiting ?? null, stolenBy: (rec.stolenBy ?? []).filter((t) => Date.now() - t.at < P.BOUNTY_TTL_MS) };
   }
+  /** Defenses as others may see them: a scarecrow reads as a gnome; the bell stays private. */
+  publicDefenses(d: Defenses): Defenses { return { gateMax: d.gateMax, gateHp: d.gateHp, gnome: d.gnome || !!d.scarecrow, sprinkler: d.sprinkler, mud: !!d.mud }; }
   publicLot(rec: PlayerRec, now: number): PublicLot {
-    return { lotId: rec.lotId, ownerId: rec.id, name: rec.name, color: rec.color, online: this.live.has(rec.id), shielded: this.isShielded(rec, now), plotCount: rec.plotCount, defenses: rec.defenses, land: this.landView(rec),
+    return { lotId: rec.lotId, ownerId: rec.id, name: rec.name, color: rec.color, online: this.live.has(rec.id), shielded: this.isShielded(rec, now), plotCount: rec.plotCount, defenses: this.publicDefenses(rec.defenses), land: this.landView(rec),
       plots: rec.plots.map((p, i) => p ? ({ i, speciesId: p.speciesId, tier: p.tier, revealed: p.revealed, size: p.size, mutation: p.mutation, lockedUntil: rec.lockedUntil[i] ?? 0, weedy: E.isWeedy(p, now) }) : null).filter((x): x is P.PublicPlot => !!x) };
   }
   pushLot(rec: PlayerRec): void { this.broadcast(rec.villageId, { t: 'lot', lot: this.publicLot(rec, Date.now()) }); }
   pushState(rec: PlayerRec, part: Partial<PrivateState>): void { this.sendTo(rec.id, { t: 'state', you: part }); }
   names(villageId: string): Record<string, { name: string; color: number }> {
     const out: Record<string, { name: string; color: number }> = {};
-    for (const l of this.live.values()) { const r = this.players.get(l.id)!; if (r.villageId === villageId) out[r.id] = { name: r.name, color: r.color }; }
+    for (const l of this.live.values()) { const r = this.players.get(l.id)!; if (this.vid(r) === villageId) out[r.id] = { name: r.name, color: r.color }; }
     return out;
   }
   snapOf(villageId: string, now: number): SnapPlayer[] {
     const out: SnapPlayer[] = [];
     for (const l of this.live.values()) {
-      const r = this.players.get(l.id)!; if (r.villageId !== villageId) continue;
-      out.push({ id: l.id, x: Math.round(l.x), y: Math.round(l.y), d: l.d, f: l.f, m: l.m, c: l.carry ? l.carry.plant.speciesId : '', ch: l.channel ? Math.min(1, (now - l.channel.startedAt) / (l.channel.endsAt - l.channel.startedAt)) : 0 });
+      const r = this.players.get(l.id)!; if (this.vid(r) !== villageId) continue;
+      const s: SnapPlayer = { id: l.id, x: Math.round(l.x), y: Math.round(l.y), d: l.d, f: l.f, m: l.m, c: l.carry ? l.carry.plant.speciesId : '', ch: l.channel ? Math.min(1, (now - l.channel.startedAt) / (l.channel.endsAt - l.channel.startedAt)) : 0 };
+      if (this.bountyOn(r, now)) s.b = true;
+      out.push(s);
     }
     return out;
   }
+  bountyOn(thief: PlayerRec, now: number): P.Bounty | null {
+    const v = this.villages.get(thief.villageId); if (!v?.bounties) return null;
+    v.bounties = v.bounties.filter((b) => b.until > now);
+    return v.bounties.find((b) => b.thiefId === thief.id) ?? null;
+  }
+  bountiesIn(villageId: string, now: number): P.Bounty[] { const v = this.villages.get(villageId); return (v?.bounties ?? []).filter((b) => b.until > now); }
   addSap(rec: PlayerRec, delta: number, reason: string): void { rec.sap += delta; if (reason !== 'tick') this.store.ledger(rec.id, delta, reason); this.store.touch(); }
 
   // ------------------------------------------------------------ join / leave
@@ -150,24 +171,65 @@ export class Game {
     let off = 0; for (const p of rec.plots) if (p) off += E.sapPerSec(p, SP.get(p.speciesId)!) * (elapsed / 1000);
     if (off >= 1) { this.addSap(rec, Math.floor(off), 'offline'); }
     rec.lastSeen = now;
-    const village = this.villages.get(rec.villageId)!; const map = this.map(rec); const gate = lotGatePx(this.lot(rec)); const l = this.lot(rec);
-    const spawn = { x: gate.x + (l.gateSide === 'left' ? -TILE : l.gateSide === 'right' ? TILE : 0), y: gate.y + (l.gateSide === 'top' ? -TILE : l.gateSide === 'bottom' ? TILE : 0) };
-    const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null };
+    if (rec.visiting && !this.villages.has(rec.visiting)) rec.visiting = null;
+    const spawn = this.spawnFor(rec);
+    const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null, lastLot: -1 };
     this.live.set(id, live);
-    const lots = village.lots.map((o) => o ? this.players.get(o) : null).filter((r): r is PlayerRec => !!r).map((r) => this.publicLot(r, now));
-    this.send(ws, { t: 'welcome', you: this.privateState(rec), village: { id: village.id, seed: village.seed, biome: map.biome, name: `${BIOME_NAMES[map.biome]} #${village.n}` }, lots, players: this.snapOf(rec.villageId, now), names: this.names(rec.villageId), feed: this.feeds.get(rec.villageId) ?? [], now });
-    for (const extra of this.life.welcome(rec.villageId)) this.send(ws, extra);
+    this.sendWelcome(live, rec, now);
     if (off >= 1) this.send(ws, { t: 'toast', text: `${copyJson.ui.offlineBack} ${Math.floor(off)} ${copyJson.ui.sap}.` });
-    this.broadcast(rec.villageId, { t: 'players', names: { [id]: { name: rec.name, color: rec.color } } }, id);
+    this.broadcast(this.vid(rec), { t: 'players', names: { [id]: { name: rec.name, color: rec.color } } }, id);
     this.pushLot(rec);
     return live;
+  }
+
+  spawnFor(rec: PlayerRec): { x: number; y: number } {
+    if (rec.visiting) return this.map(rec).spawn;
+    const gate = lotGatePx(this.lot(rec)); const l = this.lot(rec);
+    return { x: gate.x + (l.gateSide === 'left' ? -TILE : l.gateSide === 'right' ? TILE : 0), y: gate.y + (l.gateSide === 'top' ? -TILE : l.gateSide === 'bottom' ? TILE : 0) };
+  }
+
+  sendWelcome(live: Live, rec: PlayerRec, now: number): void {
+    const vid = this.vid(rec); const village = this.villages.get(vid)!; const map = this.maps.get(vid)!;
+    const lots = village.lots.map((o) => o ? this.players.get(o) : null).filter((r): r is PlayerRec => !!r).map((r) => this.publicLot(r, now));
+    this.send(live.ws, { t: 'welcome', you: this.privateState(rec), village: { id: village.id, seed: village.seed, biome: map.biome, name: this.villageName(vid) }, lots, players: this.snapOf(vid, now), names: this.names(vid), feed: this.feeds.get(vid) ?? [], now, villages: this.villageList() });
+    for (const extra of this.life.welcome(vid)) this.send(live.ws, extra);
+    this.send(live.ws, { t: 'board', sprint: this.life.board(vid), bounties: this.bountiesIn(vid, now) });
+  }
+
+  // ------------------------------------------------------------ visits (villages are rooms; friends can cross)
+  onVisit(l: Live, rec: PlayerRec, villageId: string | null, now: number): void {
+    const target = villageId ?? rec.villageId;
+    if (!this.villages.has(target) || target === this.vid(rec)) return;
+    if (l.carry && villageId) return this.send(l.ws, { t: 'toast', text: UI.cantVisitCarrying });
+    if (l.channel) this.cancelChannel(l, UI.channelMoved);
+    const from = this.vid(rec);
+    this.broadcast(from, { t: 'players', names: {}, left: [rec.id] }, rec.id);
+    rec.visiting = villageId && villageId !== rec.villageId ? villageId : null; this.store.touch();
+    const spawn = this.spawnFor(rec); l.x = spawn.x; l.y = spawn.y; l.lastLot = -1;
+    this.sendWelcome(l, rec, now);
+    this.broadcast(this.vid(rec), { t: 'players', names: { [rec.id]: { name: rec.name, color: rec.color } } }, rec.id);
+    if (rec.visiting) this.feed(rec.visiting, 'join', `${rec.name} ${UI.visitorArrived} ${this.villageName(rec.villageId)}`);
+    else { this.feed(from, 'join', `${rec.name} ${UI.wentHome}`); if (l.carry) this.score(l, rec, now); }
+  }
+
+  onBounty(l: Live, rec: PlayerRec, thiefId: string, amount: number, now: number): void {
+    const thief = this.players.get(thiefId); const a = Math.floor(Number(amount));
+    if (!thief || thief.id === rec.id || !Number.isFinite(a) || a < P.BOUNTY_MIN_POST || a > P.BOUNTY_MAX_POST) return;
+    if (!(rec.stolenBy ?? []).some((t) => t.id === thiefId && now - t.at < P.BOUNTY_TTL_MS)) return;
+    if (rec.sap < a) return this.send(l.ws, { t: 'toast', text: copyJson.ui.cantAfford });
+    const v = this.villages.get(thief.villageId)!; v.bounties = (v.bounties ?? []).filter((b) => b.until > now && b.thiefId !== thiefId);
+    const prev = this.bountyOn(thief, now); const total = a + (prev?.amount ?? 0);
+    v.bounties.push({ thiefId, thiefName: thief.name, byName: rec.name, amount: total, until: now + P.BOUNTY_TTL_MS });
+    this.addSap(rec, -a, `bounty:${thiefId}`); this.pushState(rec, { sap: rec.sap });
+    this.send(l.ws, { t: 'toast', text: `${UI.bountyPosted} ${thief.name}: ${total} ${copyJson.ui.sap}` });
+    for (const vid of new Set([this.vid(rec), thief.villageId, this.vid(thief)])) { this.feed(vid, 'tag', `${rec.name} posted a ${total} Sap bounty on ${thief.name}`); this.broadcast(vid, { t: 'board', sprint: this.life.board(vid), bounties: this.bountiesIn(vid, now) }); }
   }
 
   newPlayer(id: string, secret: string, name: string, save: GameState | null, now: number): PlayerRec {
     // find a village with a free lot
     let village = [...this.villages.values()].find((v) => v.lots.some((x) => !x));
     if (!village) {
-      village = { id: `v${this.nextVillage}`, seed: (randomSeed() % 100000) + this.nextVillage * 7, lots: Array(LOTS_PER_VILLAGE).fill(null), n: this.nextVillage };
+      village = { id: `v${this.nextVillage}`, seed: (randomSeed() % 100000) + this.nextVillage * 7, lots: Array(LOT_CAP).fill(null), n: this.nextVillage };
       this.nextVillage += 1; this.villages.set(village.id, village); this.maps.set(village.id, buildVillage(village.seed));
     }
     const lotId = village.lots.findIndex((x) => !x);
@@ -176,10 +238,10 @@ export class Game {
       id, secret, name: cleanName(name) || `Gardener ${Math.floor(Math.random() * 900 + 100)}`, color: Math.floor(Math.random() * 6),
       sap: E.STARTING_SAP, seeds: [], plots: Array(plotCount).fill(null), plotCount, lockedUntil: Array(plotCount).fill(0),
       conveyor: { slots: E.rollConveyor(this.rng, ROSTER, 'common', plotCount), refreshAt: now + E.CONVEYOR_REFRESH_MS },
-      speedLevel: 0, rarityFloor: 'common', defenses: { gateMax: 0, gateHp: 0, gnome: false, sprinkler: false },
+      speedLevel: 0, rarityFloor: 'common', defenses: { gateMax: 0, gateHp: 0, gnome: false, sprinkler: false, scarecrow: false, mud: false, bell: false },
       villageId: village.id, lotId, createdAt: now, lastSeen: now,
       stats: { seedsBought: 0, reveals: 0, steals: 0, tags: 0, stolenFrom: 0 }, stolenLog: [],
-      address: null, garden: null,
+      address: null, garden: null, visiting: null, stolenBy: [],
     };
     // migrate the M1 local save once
     if (save && typeof save.sap === 'number') {
@@ -200,7 +262,7 @@ export class Game {
     l.channel = null;
     this.live.delete(id);
     rec.lastSeen = Date.now(); this.store.touch();
-    if (!silent) { this.broadcast(rec.villageId, { t: 'players', names: {}, left: [id] }); this.pushLot(rec); }
+    if (!silent) { this.broadcast(this.vid(rec), { t: 'players', names: {}, left: [id] }); this.pushLot(rec); }
   }
 
   // ------------------------------------------------------------ messages
@@ -209,6 +271,10 @@ export class Game {
     switch (m.t) {
       case 'forage': return this.life.forage(l, rec, String(m.id));
       case 'sprint': return this.life.sprintStart(l, rec, now);
+      case 'bounty': return this.onBounty(l, rec, String(m.thiefId), m.amount, now);
+      case 'visit': return this.onVisit(l, rec, String(m.village), now);
+      case 'home': return this.onVisit(l, rec, null, now);
+      case 'villages': return this.send(l.ws, { t: 'villages', list: this.villageList() });
       case 'nonce': return this.onNonce(l, m.address, now);
       case 'link': return this.onLink(l, rec, m.address, m.signature, now);
       case 'unlink': rec.address = null; rec.garden = null; rec.rarityFloor = 'common'; this.store.touch(); this.pushState(rec, { rarityFloor: 'common', land: this.landView(rec) }); this.send(l.ws, { t: 'linked', address: null, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor }); this.pushLot(rec); return;
@@ -221,8 +287,8 @@ export class Game {
       case 'break': return this.onBreak(l, rec, m.ownerId, now);
       case 'cancel': l.channel = null; this.send(l.ws, { t: 'channel', kind: null, endsAt: 0, startedAt: 0 }); return;
       case 'chat': return this.onChat(l, rec, m.text, now);
-      case 'emote': if (Number.isInteger(m.e) && m.e >= 0 && m.e < P.EMOTES.length) this.broadcast(rec.villageId, { t: 'emote', id: l.id, e: m.e }); return;
-      case 'rename': { const n = cleanName(m.name); if (n) { rec.name = n; this.store.touch(); this.pushState(rec, { name: n }); this.broadcast(rec.villageId, { t: 'players', names: { [rec.id]: { name: n, color: rec.color } } }); this.pushLot(rec); } return; }
+      case 'emote': if (Number.isInteger(m.e) && m.e >= 0 && m.e < P.EMOTES.length) this.broadcast(this.vid(rec), { t: 'emote', id: l.id, e: m.e }); return;
+      case 'rename': { const n = cleanName(m.name); if (n) { rec.name = n; this.store.touch(); this.pushState(rec, { name: n }); this.broadcast(this.vid(rec), { t: 'players', names: { [rec.id]: { name: n, color: rec.color } } }); this.pushLot(rec); } return; }
       case 'ping': this.send(l.ws, { t: 'pong', n: m.n, now }); return;
     }
   }
@@ -268,7 +334,7 @@ export class Game {
     const dist = Math.hypot(x - l.x, y - l.y);
     if (dist <= max) {
       // accept the client's predicted position only if the path is walkable (collision re-check)
-      const gc = this.gateClosedFn(rec.villageId);
+      const gc = this.gateClosedFn(this.vid(rec));
       const r = moveActor(this.map(rec), l.x, l.y, x - l.x, y - l.y, gc);
       l.x = r.x; l.y = r.y;
     }
@@ -317,6 +383,9 @@ export class Game {
     else if (item === 'gnome') { if (rec.defenses.gnome || rec.plotCount < 4) return; if (!pay(P.SHOP_PRICES.gnome, 'gnome')) return; rec.defenses.gnome = true; }
     else if (item === 'sprinkler') { if (rec.defenses.sprinkler) return; if (!pay(P.SHOP_PRICES.sprinkler, 'sprinkler')) return; rec.defenses.sprinkler = true; }
     else if (item === 'lock') { if (plotId === undefined || !rec.plots[plotId] || (rec.lockedUntil[plotId] ?? 0) > now) return; if (!pay(P.SHOP_PRICES.lock, 'lock')) return; rec.lockedUntil[plotId] = now + P.LOCK_MS; }
+    else if (item === 'scarecrow') { if (rec.defenses.scarecrow || rec.defenses.gnome) return; if (!pay(P.SHOP_PRICES.scarecrow, 'scarecrow')) return; rec.defenses.scarecrow = true; }
+    else if (item === 'mud') { if (rec.defenses.mud) return; if (!pay(P.SHOP_PRICES.mud, 'mud')) return; rec.defenses.mud = true; }
+    else if (item === 'bell') { if (rec.defenses.bell) return; if (!pay(P.SHOP_PRICES.bell, 'bell')) return; rec.defenses.bell = true; }
     else return;
     this.store.touch(); this.pushState(rec, { sap: rec.sap, speedLevel: rec.speedLevel, defenses: rec.defenses, lockedUntil: rec.lockedUntil }); this.pushLot(rec);
   }
@@ -325,14 +394,14 @@ export class Game {
   onUproot(l: Live, rec: PlayerRec, ownerId: string, plotId: number, now: number): void {
     const deny = (t: string) => this.send(l.ws, { t: 'toast', text: t });
     const owner = this.players.get(ownerId);
-    if (!owner || owner.id === rec.id || owner.villageId !== rec.villageId || l.carry || l.channel) return;
+    if (!owner || owner.id === rec.id || owner.villageId !== this.vid(rec) || l.carry || l.channel) return;
     const inLot = lotAtPx(this.map(rec), l.x, l.y); if (!inLot || inLot.id !== owner.lotId) return deny(copyJson.ui.raidNotInLot);
     if (this.isShielded(owner, now)) return deny(copyJson.ui.raidShielded);
     const p = owner.plots[plotId]; if (!p || !p.revealed) return deny(copyJson.ui.raidNotReady);
     if ((owner.lockedUntil[plotId] ?? 0) > now) return deny(copyJson.ui.raidLocked);
     const hourAgo = now - 3600_000; owner.stolenLog = owner.stolenLog.filter((t) => t > hourAgo);
     if (owner.stolenLog.length >= P.STEAL_CAP_PER_HOUR) return deny(copyJson.ui.raidCapped);
-    if (p.tier === 'mythic') { const ol = this.live.get(owner.id); const oin = ol ? lotAtPx(this.map(owner), ol.x, ol.y) : null; if (!oin || oin.id !== owner.lotId) return deny(copyJson.ui.raidMythic); }
+    if (p.tier === 'mythic') { const ol = this.live.get(owner.id); const oin = ol && !owner.visiting ? lotAtPx(this.homeMap(owner), ol.x, ol.y) : null; if (!oin || oin.id !== owner.lotId) return deny(copyJson.ui.raidMythic); }
     if (!rec.plots.some((x) => !x)) return deny(copyJson.ui.noFreePlot);
     const pp = this.map(rec).lots[owner.lotId].plots[plotId]; if (Math.hypot(pp.tx * TILE + 16 - l.x, pp.ty * TILE + 16 - l.y) > 40) return deny(copyJson.ui.raidTooFar);
     l.channel = { kind: 'uproot', target: owner.id, plotId, startedAt: now, endsAt: now + P.UPROOT_MS, sx: l.x, sy: l.y };
@@ -343,13 +412,13 @@ export class Game {
   onBreak(l: Live, rec: PlayerRec, ownerId: string, now: number): void {
     const deny = (t: string) => this.send(l.ws, { t: 'toast', text: t });
     const owner = this.players.get(ownerId);
-    if (!owner || owner.id === rec.id || owner.villageId !== rec.villageId || l.carry || l.channel) return;
+    if (!owner || owner.id === rec.id || owner.villageId !== this.vid(rec) || l.carry || l.channel) return;
     if (owner.defenses.gateHp <= 0) return;
     if (this.isShielded(owner, now)) return deny(copyJson.ui.raidShielded);
     const g = lotGatePx(this.lot(owner)); if (Math.hypot(g.x - l.x, g.y - l.y) > 48) return deny(copyJson.ui.raidTooFar);
     l.channel = { kind: 'break', target: owner.id, plotId: -1, startedAt: now, endsAt: now + P.BREAK_HIT_MS, sx: l.x, sy: l.y };
     this.send(l.ws, { t: 'channel', kind: 'break', endsAt: l.channel.endsAt, startedAt: now });
-    this.feed(rec.villageId, 'break', `${rec.name} is breaking ${owner.name}'s gate!`);
+    this.feed(owner.villageId, 'break', `${rec.name} is breaking ${owner.name}'s gate!`);
   }
 
   cancelChannel(l: Live, why: string): void {
@@ -362,14 +431,14 @@ export class Game {
     const owner = this.players.get(ch.target); if (!owner) return;
     if (ch.kind === 'break') {
       owner.defenses.gateHp = Math.max(0, owner.defenses.gateHp - 1); this.store.touch(); this.pushLot(owner); this.pushState(owner, { defenses: owner.defenses });
-      if (owner.defenses.gateHp === 0) this.feed(rec.villageId, 'gate', `${rec.name} broke ${owner.name}'s gate open`);
+      if (owner.defenses.gateHp === 0) this.feed(owner.villageId, 'gate', `${rec.name} broke ${owner.name}'s gate open`);
       return;
     }
     const p = owner.plots[ch.plotId]; if (!p || this.isShielded(owner, now)) return;
     owner.plots[ch.plotId] = null; l.carry = { plant: p, from: owner.id, fromPlot: ch.plotId };
     this.store.touch(); this.pushLot(owner); this.pushState(owner, { plots: owner.plots });
     this.send(l.ws, { t: 'carry', speciesId: p.speciesId });
-    this.feed(rec.villageId, 'uproot', `${rec.name} uprooted ${owner.name}'s ${SP.get(p.speciesId)!.name}!`);
+    this.feed(owner.villageId, 'uproot', `${rec.name} uprooted ${owner.name}'s ${SP.get(p.speciesId)!.name}!`);
   }
 
   /** Plant returns to its owner. tagger = who tagged (bounty) or null (disconnect). */
@@ -383,8 +452,14 @@ export class Game {
     else { const free = owner.plots.findIndex((x) => !x); if (free >= 0) owner.plots[free] = c.plant; else owner.seeds.push({ uid: uid('s'), speciesId: c.plant.speciesId, tier: c.plant.tier }); }
     if (bounty && tagger) {
       const b = Math.max(P.BOUNTY_MIN, Math.floor(E.sapPerSec(c.plant, sp) * P.BOUNTY_SEC)); this.addSap(tagger, b, 'bounty'); tagger.stats.tags += 1;
+      this.feed(this.vid(thief), 'tag', `${tagger.name} tagged ${thief.name} and got the ${sp.name} back (+${b} Sap)`);
+      const posted = this.bountyOn(thief, now);
+      if (posted) {
+        const v = this.villages.get(thief.villageId)!; v.bounties = (v.bounties ?? []).filter((x) => x.thiefId !== thief.id);
+        this.addSap(tagger, posted.amount, `bounty-claim:${thief.id}`);
+        for (const vid of new Set([this.vid(thief), thief.villageId])) { this.feed(vid, 'tag', `${tagger.name} ${UI.bountyClaimed} ${thief.name} (+${posted.amount} Sap)`); this.broadcast(vid, { t: 'board', sprint: this.life.board(vid), bounties: this.bountiesIn(vid, now) }); }
+      }
       this.pushState(tagger, { sap: tagger.sap, stats: tagger.stats });
-      this.feed(thief.villageId, 'tag', `${tagger.name} tagged ${thief.name} and got the ${sp.name} back (+${b} Sap)`);
     }
     this.store.touch(); this.pushLot(owner); this.pushState(owner, { plots: owner.plots, seeds: owner.seeds });
   }
@@ -395,17 +470,21 @@ export class Game {
     l.carry = null; this.send(l.ws, { t: 'carry', speciesId: null });
     const sp = SP.get(c.plant.speciesId)!; c.plant.lastWeeded = now; thief.plots[free] = c.plant; thief.stats.steals += 1;
     const owner = this.players.get(c.from);
-    if (owner) { owner.stats.stolenFrom += 1; owner.stolenLog.push(now); this.pushState(owner, { stats: owner.stats }); }
+    if (owner) {
+      owner.stats.stolenFrom += 1; owner.stolenLog.push(now);
+      owner.stolenBy = (owner.stolenBy ?? []).filter((t) => now - t.at < P.BOUNTY_TTL_MS && t.id !== thief.id).concat([{ id: thief.id, name: thief.name, at: now }]).slice(-10);
+      this.pushState(owner, { stats: owner.stats, stolenBy: owner.stolenBy });
+    }
     this.store.touch(); this.store.ledger(thief.id, 0, `steal:${c.plant.uid}:from:${c.from}`);
     this.pushState(thief, { plots: thief.plots, stats: thief.stats }); this.pushLot(thief);
     const mut = c.plant.mutation !== 'none' ? ` (${MUT[c.plant.mutation]})` : '';
-    this.feed(thief.villageId, 'steal', `${thief.name} stole ${owner?.name ?? 'someone'}'s ${sp.name}${mut}`);
+    for (const vid of new Set([thief.villageId, owner?.villageId ?? thief.villageId])) this.feed(vid, 'steal', `${thief.name} stole ${owner?.name ?? 'someone'}'s ${sp.name}${mut}`);
   }
 
   onChat(l: Live, rec: PlayerRec, text: string, now: number): void {
     if (now - l.lastChatAt < 700) return; l.lastChatAt = now;
     const t = String(text).replace(/[<>]/g, '').trim().slice(0, 80); if (!t) return;
-    this.broadcast(rec.villageId, { t: 'chat', id: rec.id, name: rec.name, text: t });
+    this.broadcast(this.vid(rec), { t: 'chat', id: rec.id, name: rec.name, text: t });
   }
 
   // ------------------------------------------------------------ ticks
@@ -413,6 +492,12 @@ export class Game {
     this.life.tick(now);
     for (const l of this.live.values()) {
       const rec = this.players.get(l.id)!;
+      // gate bell: owner hears about anyone stepping into their lot
+      const here = lotAtPx(this.map(rec), l.x, l.y)?.id ?? -1;
+      if (here !== l.lastLot) {
+        l.lastLot = here;
+        if (here >= 0) { const owner = this.ownerOfLot(this.vid(rec), here); const ol = owner && this.live.get(owner.id); if (owner && ol && owner.id !== rec.id && owner.defenses.bell && !(this.vid(owner) === owner.villageId && lotAtPx(this.homeMap(owner), ol.x, ol.y)?.id === owner.lotId)) this.send(ol.ws, { t: 'toast', text: `${UI.bell} ${rec.name} ${UI.bellEntered}` }); }
+      }
       if (l.channel) {
         const owner = this.players.get(l.channel.target); const ol = owner ? this.live.get(owner.id) : null;
         if (ol && Math.hypot(ol.x - l.x, ol.y - l.y) < P.TAG_RADIUS) { this.cancelChannel(l, copyJson.ui.raidInterrupted); this.sendTo(owner!.id, { t: 'toast', text: `${copyJson.ui.raidYouInterrupted} ${rec.name}` }); continue; }
@@ -423,7 +508,7 @@ export class Game {
         const owner = this.players.get(l.carry.from); const ol = owner ? this.live.get(owner.id) : null;
         if (owner && ol && Math.hypot(ol.x - l.x, ol.y - l.y) < P.TAG_RADIUS) { this.recover(l, rec, owner, now, true); continue; }
         if (owner && owner.defenses.gnome) { const inLot = lotAtPx(this.map(rec), l.x, l.y); if (inLot && inLot.id === owner.lotId) { const g = this.gnomePos(owner, now); if (Math.hypot(g.x - l.x, g.y - l.y) < P.GNOME_RADIUS) { this.recover(l, rec, owner, now, true); continue; } } }
-        const mine = lotAtPx(this.map(rec), l.x, l.y); if (mine && mine.id === rec.lotId) this.score(l, rec, now);
+        const mine = lotAtPx(this.map(rec), l.x, l.y); if (!rec.visiting && mine && mine.id === rec.lotId) this.score(l, rec, now);
       }
     }
   }

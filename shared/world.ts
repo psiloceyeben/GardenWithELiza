@@ -113,6 +113,7 @@ export function buildVillage(seed: number): Village {
   props.push({ kind: 'stall', tx: 58, ty: 32, w: 2, h: 1, solid: true });
   props.push({ kind: 'board', tx: 50, ty: 32, w: 2, h: 1, solid: true });
   props.push({ kind: 'track', tx: 66, ty: 44, w: 2, h: 1, solid: false });
+  props.push({ kind: 'sign', tx: 60, ty: 46, w: 1, h: 1, solid: true });   // village signpost: visit / go home
   for (const [tx, ty] of [[49, 33], [70, 33], [49, 46], [70, 46]]) props.push({ kind: 'lamp', tx, ty, w: 1, h: 1, solid: true });
   for (const [tx, ty] of [[52, 44], [64, 36]]) props.push({ kind: 'bench', tx, ty, w: 2, h: 1, solid: true });
   for (const [tx, ty] of [[54, 36], [66, 41]]) props.push({ kind: 'pot', tx, ty, w: 1, h: 1, solid: true });

@@ -129,6 +129,23 @@ class Bot {
   check(bob.sprint && bob.sprint.phase === 'turn', 'sprint turn at the fountain');
   const sapBefore = bob.you.sap; await bob.walkTo({ x: tr.x, y: tr.y + 6 }); await sleep(400);
   check(bob.sprint && bob.sprint.phase === 'finish' && bob.you.sap > sapBefore, `sprint finished (${bob.sprint && bob.sprint.ms} ms, record=${bob.sprint && bob.sprint.record}, +sap)`);
+  // phase two: bounty on Bob (he robbed Alice), bell purchase, cross-village visit (needs PONS_LOT_CAP=2 so Carol lands in village 2)
+  check(alice.you.stolenBy && alice.you.stolenBy.some((t) => t.id === bob.id), 'Alice sees Bob in her recent thieves');
+  if (alice.you.sap >= 100) {
+    let bobWanted = false; const origOnA2 = alice.on.bind(alice); alice.on = (m) => { if (m.t === 'snap') { const b = m.p.find((p) => p.id === bob.id); if (b && b.b) bobWanted = true; } origOnA2(m); };
+    alice.send({ t: 'bounty', thiefId: bob.id, amount: 100 }); await sleep(600);
+    check(bobWanted, 'bounty posted: Bob is WANTED in snapshots');
+  } else console.log(`skip bounty (Alice sap ${alice.you.sap})`);
+  bob.send({ t: 'shop', item: 'bell' }); await sleep(300);
+  check(bob.you.defenses.bell === true || bob.you.sap < P.SHOP_PRICES.bell, `bell purchase (sap=${Math.round(bob.you.sap)})`);
+  const carol = new Bot('Carol'); await carol.connect();
+  check(carol.you.villageId !== alice.you.villageId, `Carol landed in a different village (${carol.you.villageId})`);
+  const welcomes = []; const origOnC = carol.on.bind(carol); carol.on = (m) => { if (m.t === 'welcome') welcomes.push(m.village.id); origOnC(m); };
+  carol.send({ t: 'visit', village: alice.you.villageId }); await sleep(600);
+  check(welcomes[0] === alice.you.villageId && carol.you.visiting === alice.you.villageId, 'Carol is visiting Alice village');
+  carol.send({ t: 'home' }); await sleep(600);
+  check(welcomes[1] === carol.you.villageId && carol.you.visiting === null, 'Carol went home');
+  carol.ws.close();
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS');
   alice.ws.close(); bob.ws.close(); process.exit(fails.length ? 1 : 0);
 })();

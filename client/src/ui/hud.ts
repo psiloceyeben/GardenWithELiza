@@ -6,7 +6,7 @@ import { COPY, TIER_NAME, MUTATION_NAME, MUTATION_FLAVOR, speciesById } from '..
 import type { WorldScene } from '../scenes/WorldScene';
 import { sfx } from '../audio';
 
-type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land';
+type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land' | 'villages';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
@@ -60,12 +60,12 @@ export class Hud {
     let sps = 0; for (const p of you.plots) if (p) sps += E.sapPerSec(p, speciesById(p.speciesId));
     $('sap').textContent = this.fmtNum(you.sap); $('sps').textContent = (Math.round(sps * 100) / 100).toString();
     $('plots').textContent = `${you.plots.filter((p) => p).length}/${you.plotCount}`;
-    $('village').textContent = `${this.scene.villageName} · ${this.scene.onlineCount()} ${COPY.here}`;
+    $('village').textContent = `${this.scene.villageName}${you.visiting ? ` (${COPY.visit.toLowerCase()})` : ''} · ${this.scene.onlineCount()} ${COPY.here}`;
     const c = $('carry'); if (this.scene.carrying) { c.hidden = false; c.textContent = `${COPY.carrying} ${speciesById(this.scene.carrying).name}. ${COPY.runHome}`; } else c.hidden = true;
     if (this.open_) this.render(this.open_);
   }
 
-  open(id: PanelId): void { this.open_ = id; $('panel').hidden = false; this.render(id); }
+  open(id: PanelId): void { this.open_ = id; $('panel').hidden = false; if (id === 'villages') this.scene.refreshVillages(); this.render(id); }
   close(): void { this.open_ = null; $('panel').hidden = true; }
   toast(msg: string, ms = 2500): void { const t = $('toast'); t.textContent = msg; t.classList.add('on'); window.clearTimeout(this.toastTimer); this.toastTimer = window.setTimeout(() => t.classList.remove('on'), ms); }
 
@@ -115,12 +115,25 @@ export class Hud {
         + (d.gateMax && d.gateHp < d.gateMax ? row(COPY.defRepair, '', `${P.SHOP_PRICES.repair} ${COPY.sap}`, COPY.buy, 'repair', you.sap < P.SHOP_PRICES.repair) : '')
         + row(COPY.defGnome, COPY.defGnomeDesc, d.gnome ? COPY.owned : `${P.SHOP_PRICES.gnome} ${COPY.sap}`, d.gnome ? COPY.owned : COPY.buy, 'gnome', d.gnome || you.sap < P.SHOP_PRICES.gnome)
         + row(COPY.defSprinkler, COPY.defSprinklerDesc, d.sprinkler ? COPY.owned : `${P.SHOP_PRICES.sprinkler} ${COPY.sap}`, d.sprinkler ? COPY.owned : COPY.buy, 'sprinkler', d.sprinkler || you.sap < P.SHOP_PRICES.sprinkler)
-        + row(COPY.defLock, COPY.defLockDesc, `${P.SHOP_PRICES.lock} ${COPY.sap}`, COPY.buy, 'lock', you.sap < P.SHOP_PRICES.lock || !you.plots.some((p) => p));
-      body.querySelectorAll<HTMLButtonElement>('[data-shop]').forEach((b) => b.addEventListener('click', () => this.scene.shop(b.dataset.shop as 'train')));
+        + row(COPY.defLock, COPY.defLockDesc, `${P.SHOP_PRICES.lock} ${COPY.sap}`, COPY.buy, 'lock', you.sap < P.SHOP_PRICES.lock || !you.plots.some((p) => p))
+        + row(COPY.defScarecrow, COPY.defScarecrowDesc, d.scarecrow ? COPY.owned : `${P.SHOP_PRICES.scarecrow} ${COPY.sap}`, d.scarecrow ? COPY.owned : COPY.buy, 'scarecrow', !!d.scarecrow || d.gnome || you.sap < P.SHOP_PRICES.scarecrow)
+        + row(COPY.defMud, COPY.defMudDesc, d.mud ? COPY.owned : `${P.SHOP_PRICES.mud} ${COPY.sap}`, d.mud ? COPY.owned : COPY.buy, 'mud', !!d.mud || you.sap < P.SHOP_PRICES.mud)
+        + row(COPY.defBell, COPY.defBellDesc, d.bell ? COPY.owned : `${P.SHOP_PRICES.bell} ${COPY.sap}`, d.bell ? COPY.owned : COPY.buy, 'bell', !!d.bell || you.sap < P.SHOP_PRICES.bell);
+      body.querySelectorAll<HTMLButtonElement>('[data-shop]').forEach((b) => b.addEventListener('click', () => this.scene.shop(b.dataset.shop as P.ShopItem)));
     } else if (id === 'feed') {
       title.textContent = COPY.board;
       const board = this.scene.board.length ? this.scene.board.map((e, i) => `<div class="row"><span>${i + 1}. ${esc(e.name)}</span><span>${(e.ms / 1000).toFixed(2)} s</span></div>`).join('') : `<div class="note">${COPY.sprintHint}</div>`;
-      body.innerHTML = `<div class="note">${COPY.sprintBoard}</div>${board}<div class="note">${COPY.feed}</div>` + (this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`);
+      const bounties = this.scene.bounties.length ? this.scene.bounties.map((b) => `<div class="row"><span class="m-screaming">${COPY.wanted}: ${esc(b.thiefName)}</span><span class="price">${b.amount} ${COPY.sap}</span></div>`).join('') : '';
+      const thieves = you.stolenBy.length ? you.stolenBy.map((t) => `<div class="row"><span>${esc(t.name)}</span><button data-bounty="${t.id}" ${you.sap < 100 ? 'disabled' : ''}>${COPY.postBounty} 100</button></div>`).join('') : `<div class="note">${COPY.noThieves}</div>`;
+      body.innerHTML = `<div class="note">${COPY.sprintBoard}</div>${board}<div class="note">${COPY.bounties}</div>${bounties}<div class="note">${COPY.recentThieves}</div>${thieves}<div class="note">${COPY.feed}</div>` + (this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`);
+      body.querySelectorAll<HTMLButtonElement>('[data-bounty]').forEach((b) => b.addEventListener('click', () => this.scene.postBounty(b.dataset.bounty!, 100)));
+    } else if (id === 'villages') {
+      title.textContent = COPY.villages;
+      const here = this.scene.villageId;
+      body.innerHTML = (you.visiting ? `<div class="note">${COPY.youAreVisiting} ${esc(this.scene.villageName)}.</div><div class="buy" style="margin-bottom:8px"><button id="btn-home">${COPY.goHome}</button></div>` : '')
+        + this.scene.villages.map((v) => `<div class="row"><span>${esc(v.name)}${v.id === you.villageId ? ' ★' : ''}</span><span>${v.online} ${COPY.here} · ${v.free} free <button data-visit="${v.id}" ${v.id === here ? 'disabled' : ''}>${v.id === you.villageId ? COPY.goHome : COPY.visit}</button></span></div>`).join('');
+      body.querySelector('#btn-home')?.addEventListener('click', () => this.scene.goHome());
+      body.querySelectorAll<HTMLButtonElement>('[data-visit]').forEach((b) => b.addEventListener('click', () => { if (b.dataset.visit === you.villageId) this.scene.goHome(); else this.scene.visit(b.dataset.visit!); }));
     } else if (id === 'emotes') {
       title.textContent = COPY.emotes;
       body.innerHTML = `<div class="emotes">${P.EMOTES.map((e, i) => `<button data-emote="${i}">${e}</button>`).join('')}</div>`;

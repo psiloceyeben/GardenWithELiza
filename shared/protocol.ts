@@ -8,7 +8,14 @@ export interface Defenses {
   gateHp: number;
   gnome: boolean;
   sprinkler: boolean;
+  scarecrow?: boolean;  // decoy: looks like a gnome to everyone else, never tags
+  mud?: boolean;        // slows every non-owner inside the lot
+  bell?: boolean;       // owner is told the moment someone enters the lot
 }
+
+export interface Bounty { thiefId: string; thiefName: string; byName: string; amount: number; until: number; }
+export interface VillageInfo { id: string; name: string; online: number; free: number; }
+export interface Thief { id: string; name: string; at: number; }
 
 /** What everyone in the village may see about a lot. */
 export interface PublicPlot { i: number; speciesId: string; tier: Tier; revealed: boolean; size: number; mutation: MutationId; lockedUntil: number; weedy: boolean; }
@@ -52,9 +59,11 @@ export interface PrivateState {
   stats: { seedsBought: number; reveals: number; steals: number; tags: number; stolenFrom: number };
   lockedUntil: number[];
   land: LandView;
+  visiting: string | null;   // village id when away from home
+  stolenBy: Thief[];         // who robbed you in the last hour (bounty targets)
 }
 
-export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; }
+export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; b?: boolean; }
 
 export type ClientMsg =
   | { t: 'hello'; id: string; secret: string; name: string; save?: GameState | null; village?: string }
@@ -62,7 +71,7 @@ export type ClientMsg =
   | { t: 'buy'; slot: number }
   | { t: 'plant'; seedUid: string; plotId: number }
   | { t: 'tend'; plotId: number }
-  | { t: 'shop'; item: 'train' | 'fence' | 'repair' | 'gnome' | 'sprinkler' | 'lock'; plotId?: number }
+  | { t: 'shop'; item: ShopItem; plotId?: number }
   | { t: 'uproot'; ownerId: string; plotId: number }
   | { t: 'break'; ownerId: string }
   | { t: 'cancel' }
@@ -74,12 +83,19 @@ export type ClientMsg =
   | { t: 'unlink' }
   | { t: 'forage'; id: string }
   | { t: 'sprint' }
+  | { t: 'bounty'; thiefId: string; amount: number }
+  | { t: 'visit'; village: string }
+  | { t: 'home' }
+  | { t: 'villages' }
   | { t: 'ping'; n: number };
+
+export type ShopItem = 'train' | 'fence' | 'repair' | 'gnome' | 'sprinkler' | 'lock' | 'scarecrow' | 'mud' | 'bell';
 
 export interface FeedEvent { at: number; kind: 'steal' | 'tag' | 'gate' | 'reveal' | 'join' | 'uproot' | 'break'; text: string; }
 
 export type ServerMsg =
-  | { t: 'welcome'; you: PrivateState; village: { id: string; seed: number; biome: number; name: string }; lots: PublicLot[]; players: SnapPlayer[]; names: Record<string, { name: string; color: number }>; feed: FeedEvent[]; now: number }
+  | { t: 'welcome'; you: PrivateState; village: { id: string; seed: number; biome: number; name: string }; lots: PublicLot[]; players: SnapPlayer[]; names: Record<string, { name: string; color: number }>; feed: FeedEvent[]; now: number; villages: VillageInfo[] }
+  | { t: 'villages'; list: VillageInfo[] }
   | { t: 'snap'; now: number; p: SnapPlayer[] }
   | { t: 'state'; you: Partial<PrivateState> }
   | { t: 'lot'; lot: PublicLot }
@@ -97,7 +113,7 @@ export type ServerMsg =
   | { t: 'wild'; add?: Wild[]; remove?: string[]; all?: Wild[] }
   | { t: 'event'; ev: VillageEvent | null }
   | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }
-  | { t: 'board'; sprint: SprintEntry[] }
+  | { t: 'board'; sprint: SprintEntry[]; bounties?: Bounty[] }
   | { t: 'pong'; n: number; now: number };
 
 // Phase one [TUNABLE]
@@ -127,5 +143,9 @@ export const LOCK_MS = 24 * 3600_000;
 export const TICK_MS = 50;
 export const SNAP_MS = 100;
 export const BASE_SPEED = 90;
-export const SHOP_PRICES = { fence: 300, repair: 100, gnome: 800, sprinkler: 500, lock: 150 } as const;
+export const SHOP_PRICES = { fence: 300, repair: 100, gnome: 800, sprinkler: 500, lock: 150, scarecrow: 250, mud: 400, bell: 150 } as const;
+export const MUD_SPEED = 0.6;
+export const BOUNTY_MIN_POST = 50;
+export const BOUNTY_MAX_POST = 2000;
+export const BOUNTY_TTL_MS = 3600_000;
 export const EMOTES = ['👋', '😂', '😭', '😡', '❤️', '💀'];

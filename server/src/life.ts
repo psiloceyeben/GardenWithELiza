@@ -81,7 +81,7 @@ export class Life {
       const ev = this.events.get(vid);
       if (ev && now >= ev.endsAt) { this.events.set(vid, null); this.game.broadcast(vid, { t: 'event', ev: null }); }
       // wild spawns + expiry (only villages with someone online)
-      const online = [...this.game.live.values()].some((l) => this.game.players.get(l.id)?.villageId === vid);
+      const online = [...this.game.live.values()].some((l) => { const r = this.game.players.get(l.id); return !!r && this.game.vid(r) === vid; });
       if (!online) continue;
       const list = this.wild.get(vid) ?? []; const gone = list.filter((w) => now > w.until).map((w) => w.id);
       if (gone.length) { this.wild.set(vid, list.filter((w) => now <= w.until)); this.game.broadcast(vid, { t: 'wild', remove: gone }); }
@@ -99,25 +99,25 @@ export class Life {
       if (!s.turned) { if (Math.hypot(l.x - fo.x, l.y - fo.y) < 60) { s.turned = true; this.game.send(l.ws, { t: 'sprint', phase: 'turn' }); } continue; }
       if (Math.hypot(l.x - tr.x, l.y - tr.y) < 40) {
         const ms = now - s.startedAt; this.sprints.delete(id); this.lastSprint.set(id, now);
-        const vrec = this.game.villages.get(rec.villageId)!; const board = (vrec.sprint ?? []).slice();
+        const vrec = this.game.villages.get(this.game.vid(rec))!; const board = (vrec.sprint ?? []).slice();
         const record = !board.length || ms < board[0].ms;
         board.push({ name: rec.name, ms, at: now }); board.sort((a, b) => a.ms - b.ms); vrec.sprint = board.slice(0, 5); this.game.store.touch();
         const reward = P.SPRINT_REWARD + (record ? P.SPRINT_RECORD_BONUS : 0); this.game.addSap(rec, reward, 'sprint');
         const best = Math.min(ms, ...board.filter((b) => b.name === rec.name).map((b) => b.ms));
         this.game.send(l.ws, { t: 'sprint', phase: 'finish', ms, best, record }); this.game.pushState(rec, { sap: rec.sap });
-        this.game.broadcast(rec.villageId, { t: 'board', sprint: vrec.sprint });
-        if (record) this.game.feed(rec.villageId, 'tag', `${rec.name} set the sprint record: ${(ms / 1000).toFixed(2)} s`);
+        this.game.broadcast(this.game.vid(rec), { t: "board", sprint: vrec.sprint, bounties: this.game.bountiesIn(this.game.vid(rec), now) });
+        if (record) this.game.feed(this.game.vid(rec), 'tag', `${rec.name} set the sprint record: ${(ms / 1000).toFixed(2)} s`);
       }
     }
   }
 
   // ------------------------------------------------------------ intents
   forage(l: { x: number; y: number; ws: import('ws').WebSocket }, rec: PlayerRec, id: string): void {
-    const list = this.wild.get(rec.villageId) ?? []; const w = list.find((x) => x.id === id);
+    const list = this.wild.get(this.game.vid(rec)) ?? []; const w = list.find((x) => x.id === id);
     if (!w) return this.game.send(l.ws, { t: 'toast', text: UI.wildGone });
     if (Math.hypot(w.x - l.x, w.y - l.y) > 44) return this.game.send(l.ws, { t: 'toast', text: UI.raidTooFar });
     if (rec.seeds.length >= 40) return;
-    this.wild.set(rec.villageId, list.filter((x) => x.id !== id)); this.game.broadcast(rec.villageId, { t: 'wild', remove: [id] });
+    this.wild.set(this.game.vid(rec), list.filter((x) => x.id !== id)); this.game.broadcast(this.game.vid(rec), { t: 'wild', remove: [id] });
     rec.seeds.push({ uid: uid('s'), speciesId: w.speciesId, tier: w.tier }); this.game.store.touch();
     this.game.pushState(rec, { seeds: rec.seeds }); this.game.send(l.ws, { t: 'toast', text: `${UI.wildFound} ${SP.get(w.speciesId)!.name}!` });
   }
