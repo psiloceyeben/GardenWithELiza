@@ -141,6 +141,36 @@ def npc(frame):
 
 SHIRTS = ['C', 'r', 'G', 'P', 'o', 't']
 
+# ---------------------------------------------------------------- town: buildings + named NPCs
+BUILDINGS = {  # kind: (roof colour, wall colour, sign glyph colour)
+    'hall': ('C', 'W', 'Y'), 'seedshop': ('G', 'e', 'r'), 'tavern': ('r', 'b', 'Y'), 'shrine': ('v', 'W', 'c'), 'tower': ('S', 's', 'r'),
+}
+
+
+def building(kind):
+    roof, wall, glyph = BUILDINGS[kind]
+    cv = Canvas(96, 64)
+    if kind == 'tower':
+        cv.rect(30, 8, 36, 54, wall); cv.rect(28, 4, 40, 6, roof)
+        for x in range(28, 68, 8): cv.rect(x, 0, 4, 5, roof)
+        cv.rect(40, 20, 6, 8, 'K'); cv.rect(52, 20, 6, 8, 'K'); cv.rect(44, 44, 10, 18, 'D'); cv.set(52, 53, glyph)
+        cv.outline(); return cv
+    cv.rect(8, 26, 80, 36, wall)
+    cv.tri_up(48, 28, 46, 20, roof); cv.rect(2, 26, 92, 3, roof)
+    for x in (18, 68): cv.rect(x, 34, 10, 9, 'c'); cv.rect(x + 4, 34, 2, 9, 'D'); cv.rect(x, 38, 10, 1, 'D')
+    cv.rect(42, 44, 12, 18, 'D'); cv.set(51, 53, '1')
+    cv.rect(38, 18, 20, 8, 'b'); cv.rect(40, 20, 16, 4, 'W')
+    if kind == 'hall': cv.rect(46, 21, 4, 2, glyph); cv.set(45, 20, glyph); cv.set(50, 20, glyph)
+    elif kind == 'seedshop': cv.rect(45, 21, 6, 3, 'B'); cv.rect(47, 19, 2, 2, 'G')
+    elif kind == 'tavern': cv.rect(44, 20, 5, 4, 'y'); cv.rect(49, 21, 2, 2, 'y'); cv.set(46, 19, 'w')
+    elif kind == 'shrine': cv.ellipse(48, 22, 3, 2, glyph); cv.set(48, 22, 'w')
+    cv.outline(); return cv
+
+
+NPC_KINDS = {  # id: (shirt remap, hat remap)
+    'mayor': {'r': 'P', 'W': 'K'}, 'seedwife': {'r': 'G', 'W': 'y'}, 'barkeep': {'r': 'B', 'W': 'W'}, 'oracle': {'r': 'v', 'W': 'c'}, 'warden': {'r': 'S', 'W': 's'},
+}
+
 
 def build(out):
     base = [(k, tile(k, i + 1)) for i, k in enumerate(TILE_ORDER)]
@@ -154,7 +184,10 @@ def build(out):
             for fr in range(2): chars.append((f"farmer{v}{h}_carry{fr}", farmer('down', fr, carry=True, shirt=shirt, hat=h)))
     for fr in range(3): chars.append((f"gnome{fr}", gnome(fr)))
     for fr in range(2): chars.append((f"npc{fr}", npc(fr)))
+    for nid, mp in NPC_KINDS.items():
+        for fr in range(2): chars.append((f"npc_{nid}{fr}", remapped(npc(fr), mp)))
     pack(chars, 32, 32, 16, 'chars', out)
+    pack([(f"bld_{k}", building(k)) for k in BUILDINGS], 96, 64, 5, 'town', out)
     pk = [(k, plaza(k)) for k in ('fountain0', 'fountain1', 'lamp0', 'lamp1', 'bench', 'board', 'stall', 'sign', 'track', 'pot')] + [(f'decor{i}', decor(i)) for i in range(3)] + [('weeds', weeds())]
     pack(pk, 64, 64, 5, 'plaza', out)
     return len(base), len(BIOMES), len(chars), len(pk)

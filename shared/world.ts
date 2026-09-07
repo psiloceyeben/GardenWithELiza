@@ -32,6 +32,8 @@ export interface Lot {
   center: { x: number; y: number };     // px
 }
 export interface Prop { kind: string; tx: number; ty: number; w: number; h: number; solid: boolean; }
+export interface NpcSpot { id: string; tx: number; ty: number; }   // named NPCs live in shared/missions.ts; positions here
+export const TOWN = { street: { x: 30, y: 8, w: 61, h: 2 }, buildings: [['hall', 32], ['seedshop', 44], ['tavern', 56], ['shrine', 68], ['tower', 80]] as [string, number][], npcs: ['mayor', 'seedwife', 'barkeep', 'oracle', 'warden'] };
 export interface Village {
   seed: number;
   biome: number;
@@ -39,6 +41,7 @@ export interface Village {
   lots: Lot[];
   props: Prop[];
   plaza: { x: number; y: number; w: number; h: number };
+  npcs: NpcSpot[];
   spawn: { x: number; y: number }; // px
   conveyor: { tx: number; ty: number };
   board: { tx: number; ty: number };
@@ -67,6 +70,12 @@ export function buildVillage(seed: number): Village {
   const plaza = { x: 48, y: 32, w: 24, h: 16 };
   fill(plaza.x, plaza.y, plaza.w, plaza.h, T.cobble);
   fill(plaza.x + 2, plaza.y + 2, plaza.w - 4, plaza.h - 4, T.stone);
+
+  // town street (north), a road down to the ring, buildings with an NPC at each door
+  fill(TOWN.street.x, TOWN.street.y, TOWN.street.w, TOWN.street.h, T.cobble);
+  fill(59, 10, 2, 14, T.path);
+  const npcs: NpcSpot[] = [];
+  TOWN.buildings.forEach(([kind, bx], i) => { npcs.push({ id: TOWN.npcs[i], tx: bx + 1, ty: 10 }); void kind; });
 
   // ring roads + spokes
   fill(23, 10, 2, 60, T.path); fill(95, 10, 2, 60, T.path);
@@ -116,6 +125,9 @@ export function buildVillage(seed: number): Village {
   props.push({ kind: 'board', tx: 50, ty: 32, w: 2, h: 1, solid: true });
   props.push({ kind: 'track', tx: 66, ty: 44, w: 2, h: 1, solid: false });
   props.push({ kind: 'sign', tx: 60, ty: 46, w: 1, h: 1, solid: true });   // village signpost: visit / go home
+  for (const [kind, bx] of TOWN.buildings) props.push({ kind: `bld_${kind}`, tx: bx, ty: 6, w: 3, h: 2, solid: true });
+  for (const n of npcs) props.push({ kind: `npc_${n.id}`, tx: n.tx, ty: n.ty, w: 1, h: 1, solid: true });
+  for (const [tx, ty] of [[36, 3], [52, 3], [64, 3], [88, 4]]) props.push({ kind: 'lamp', tx, ty, w: 1, h: 1, solid: true });
   for (const [tx, ty] of [[49, 33], [70, 33], [49, 46], [70, 46]]) props.push({ kind: 'lamp', tx, ty, w: 1, h: 1, solid: true });
   for (const [tx, ty] of [[52, 44], [64, 36]]) props.push({ kind: 'bench', tx, ty, w: 2, h: 1, solid: true });
   for (const [tx, ty] of [[54, 36], [66, 41]]) props.push({ kind: 'pot', tx, ty, w: 1, h: 1, solid: true });
@@ -123,12 +135,12 @@ export function buildVillage(seed: number): Village {
   let tries = 0;
   while (props.length < 60 && tries++ < 4000) {
     const tx = 2 + Math.floor(rng() * (VILLAGE_W - 4)); const ty = 2 + Math.floor(rng() * (VILLAGE_H - 4));
-    if (!isGrass(grid, tx, ty) || !isGrass(grid, tx, ty + 1) || nearLot(lots, tx, ty) || nearPlaza(plaza, tx, ty)) continue;
+    if (!isGrass(grid, tx, ty) || !isGrass(grid, tx, ty + 1) || nearLot(lots, tx, ty) || nearPlaza(plaza, tx, ty) || (ty < 12 && tx >= 28 && tx < 93)) continue;
     props.push({ kind: `tree${2 + Math.floor(rng() * 3)}`, tx, ty, w: 1, h: 1, solid: true });
   }
 
   const spawn = { x: 60 * TILE, y: 51 * TILE };
-  return { seed, biome: seed % BIOME_NAMES.length, grid, lots, props, plaza, spawn, conveyor, board, track };
+  return { seed, biome: seed % BIOME_NAMES.length, grid, lots, props, plaza, npcs, spawn, conveyor, board, track };
 }
 
 function isGrass(grid: Uint8Array, tx: number, ty: number): boolean {

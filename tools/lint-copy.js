@@ -34,6 +34,8 @@ function walkDir(dir, exts, fn) {
 }
 
 walkDir(path.join(root, 'content'), ['.json'], (p) => walkJson(JSON.parse(fs.readFileSync(p, 'utf8')), path.relative(root, p)));
+walkDir(path.join(root, 'content/lore'), ['.md'], (p) => fs.readFileSync(p, 'utf8').split('\n').forEach((line, i) => checkString(line, `${path.relative(root, p)}:${i + 1}`)));
+walkDir(path.join(root, 'shared'), ['.ts'], (p) => { if (p.endsWith('missions.ts')) (fs.readFileSync(p, 'utf8').match(/'(?:[^'\\]|\\.)*'/g) || []).forEach((l) => checkString(l.slice(1, -1), path.relative(root, p))); });
 walkDir(path.join(root, 'client/src'), ['.ts', '.html'], (p) => {
   const src = fs.readFileSync(p, 'utf8');
   const lits = src.match(/(['"`])(?:(?!\1)[^\\]|\\.)*\1/g) || [];

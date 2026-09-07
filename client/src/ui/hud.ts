@@ -6,8 +6,9 @@ import { COPY, TIER_NAME, MUTATION_NAME, MUTATION_FLAVOR, speciesById } from '..
 import type { WorldScene } from '../scenes/WorldScene';
 import { sfx } from '../audio';
 import { detectWallets } from '../wallet';
+import { MISSIONS, npcById, type MissionView } from '@shared/missions';
 
-type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land' | 'villages';
+type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land' | 'villages' | 'talk';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
@@ -151,8 +152,10 @@ export class Hud {
       const thieves = you.stolenBy.length ? you.stolenBy.map((t) => `<div class="row"><span>${esc(t.name)}</span><button data-bounty="${t.id}" ${you.sap < 100 ? 'disabled' : ''}>${COPY.postBounty} 100</button></div>`).join('') : `<div class="note">${COPY.noThieves}</div>`;
       const tr = this.scene.trophies; const list = (xs: { name: string; n: number }[]) => xs.length ? xs.map((x) => `${esc(x.name)} ${x.n}`).join(', ') : '—';
       const trophies = tr ? `<div class="row"><span>${COPY.trophySteals}</span><span>${list(tr.steals)}</span></div><div class="row"><span>${COPY.trophyTags}</span><span>${list(tr.tags)}</span></div><div class="row"><span>${COPY.trophyHeist}</span><span>${tr.heists.length ? tr.heists.map((h) => `${esc(h.name)}: <span class="t-${h.tier}">${esc(h.species)}</span>`).join(', ') : '—'}</span></div>` : '';
-      body.innerHTML = `<div class="note">${COPY.trophies}</div>${trophies}<div class="note">${COPY.sprintBoard}</div>${board}<div class="note">${COPY.bounties}</div>${bounties}<div class="note">${COPY.recentThieves}</div>${thieves}<div class="note">${COPY.feed}</div>` + (this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`);
+      const active = Object.entries(you.missions?.active ?? {}).map(([id, p]) => { const m = MISSIONS.find((x) => x.id === id); return m ? `<div class="row"><span>${esc(m.title)} <span class="note">(${esc(npcById(m.npc)?.name ?? '')})</span></span><span>${Math.min(p, m.target)}/${m.target}</span></div>` : ''; }).join('');
+      body.innerHTML = `<div class="note">${COPY.activeMissions}</div>${active || `<div class="note">${COPY.noMissions}</div>`}<div class="note">${COPY.trophies}</div>${trophies}<div class="note">${COPY.sprintBoard}</div>${board}<div class="note">${COPY.bounties}</div>${bounties}<div class="note">${COPY.recentThieves}</div>${thieves}<div class="note">${COPY.feed}</div>` + (this.scene.feed.length ? this.scene.feed.map((e) => `<div class="fe fe-${e.kind}">${esc(e.text)}</div>`).join('') : `<div class="note">…</div>`);
       body.querySelectorAll<HTMLButtonElement>('[data-bounty]').forEach((b) => b.addEventListener('click', () => this.scene.postBounty(b.dataset.bounty!, 100)));
+    } else if (id === 'talk') { this.renderTalk();
     } else if (id === 'villages') {
       title.textContent = COPY.villages;
       const here = this.scene.villageId;
@@ -187,6 +190,26 @@ export class Hud {
         <div class="note">${COPY.oddsMutations}</div>${E.MUTATIONS.map((m) => `<div class="row"><span class="m-${m.id}">${MUTATION_NAME[m.id]}${m.id !== 'none' ? ` x${m.mult}` : ''}</span><span>${(m.odds * 100).toFixed(1)}%</span></div>`).join('')}
         <div class="note">${COPY.oddsNote}</div>`;
     }
+  }
+
+  // ------------------------------------------------------------ town: NPC dialogue + missions
+  private talkNpc: { npc: string; name: string; line: string; missions: MissionView[] } | null = null;
+  talk(npc: string, name: string, line: string, missions: MissionView[]): void {
+    const keepLine = this.talkNpc?.npc === npc && !line ? this.talkNpc.line : line;
+    this.talkNpc = { npc, name, line: keepLine, missions }; this.open('talk');
+  }
+  say(name: string, text: string): void {
+    const box = document.getElementById('npc-say'); if (box) { box.innerHTML = `<b>${esc(name)}</b> ${esc(text)}`; box.classList.remove('thinking'); }
+  }
+  private renderTalk(): void {
+    const t = this.talkNpc; if (!t) return; const body = $('panel-body'); $('panel-title').textContent = t.name;
+    const label = (s: string) => s === 'available' ? COPY.accept : s === 'ready' ? COPY.claim : s === 'active' ? '' : COPY.missionTomorrow;
+    body.innerHTML = `<div class="fe">${esc(t.line)}</div><div class="note">${COPY.missions}</div>`
+      + (t.missions.length ? t.missions.map((m) => `<div class="item"><div><div class="name">${esc(m.title)} <span class="price">+${m.reward} ${COPY.sap}</span></div><div class="note">${esc(m.text)}</div></div><div class="buy"><span>${m.status === 'done' ? COPY.missionDone : `${m.progress}/${m.target}`}</span>${label(m.status) ? `<button data-mission="${m.id}" data-action="${m.status === 'ready' ? 'claim' : 'accept'}" ${m.status === 'done' ? 'disabled' : ''}>${label(m.status)}</button>` : ''}</div></div>`).join('') : `<div class="note">${COPY.noMissions}</div>`)
+      + `<div class="note">${COPY.ask}</div><div class="buy"><input id="npc-ask" maxlength="160" placeholder="${COPY.askPlaceholder}" style="flex:1"><button id="npc-ask-go">${COPY.ask}</button></div><div id="npc-say" class="note" style="min-height:24px"></div>`;
+    body.querySelectorAll<HTMLButtonElement>('[data-mission]').forEach((b) => b.addEventListener('click', () => this.scene.mission(b.dataset.mission!, b.dataset.action as 'accept' | 'claim')));
+    const inp = body.querySelector<HTMLInputElement>('#npc-ask')!; const go = () => { const q = inp.value.trim(); if (!q) return; inp.value = ''; const box = $('npc-say'); box.textContent = COPY.thinking; this.scene.ask(t.npc, q); };
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') go(); }); body.querySelector('#npc-ask-go')!.addEventListener('click', go);
   }
 
   reveal(plant: Plant, species: Species): void { this.revealQueue.push({ plant, species }); if (this.revealQueue.length === 1) this.showReveal(); }

@@ -77,6 +77,7 @@ export interface PrivateState {
   cosmetics: Cosmetics;
   hat: number;
   weekly: Weekly;
+  missions: MissionState;
 }
 
 export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; b?: boolean; }
@@ -106,7 +107,12 @@ export type ClientMsg =
   | { t: 'cosmetic'; item: CosmeticItem }
   | { t: 'wardrobe'; shirt?: number; hat?: number }
   | { t: 'nick'; plotId: number; name: string }
+  | { t: 'talk'; npc: string }
+  | { t: 'mission'; id: string; action: 'accept' | 'claim' }
+  | { t: 'ask'; npc: string; text: string }
   | { t: 'ping'; n: number };
+
+export interface MissionState { active: Record<string, number>; done: Record<string, string>; }   // done[id] = day key
 
 export type ShopItem = 'train' | 'fence' | 'repair' | 'gnome' | 'sprinkler' | 'lock' | 'scarecrow' | 'mud' | 'bell';
 
@@ -130,6 +136,8 @@ export type ServerMsg =
   | { t: 'nonce'; address: string; message: string }
   | { t: 'linked'; address: string | null; land: LandView; plotCount: number; rarityFloor: Tier }
   | { t: 'identity'; id: string; secret: string; name: string }   // wallet sign-in adopted an existing player: store and reconnect as them
+  | { t: 'npc'; npc: string; name: string; line: string; missions: import('./missions').MissionView[] }
+  | { t: 'say'; npc: string; name: string; text: string; oracle: boolean }
   | { t: 'wild'; add?: Wild[]; remove?: string[]; all?: Wild[] }
   | { t: 'event'; ev: VillageEvent | null }
   | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }

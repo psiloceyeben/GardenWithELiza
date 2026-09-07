@@ -104,7 +104,7 @@ export class Life {
         board.push({ name: rec.name, ms, at: now }); board.sort((a, b) => a.ms - b.ms); vrec.sprint = board.slice(0, 5); this.game.store.touch();
         const reward = P.SPRINT_REWARD + (record ? P.SPRINT_RECORD_BONUS : 0); this.game.addSap(rec, reward, 'sprint');
         const best = Math.min(ms, ...board.filter((b) => b.name === rec.name).map((b) => b.ms));
-        this.game.send(l.ws, { t: 'sprint', phase: 'finish', ms, best, record }); this.game.pushState(rec, { sap: rec.sap });
+        this.game.send(l.ws, { t: 'sprint', phase: 'finish', ms, best, record }); this.game.pushState(rec, { sap: rec.sap }); this.game.progress(rec, "sprint");
         this.game.broadcast(this.game.vid(rec), this.game.boardMsg(this.game.vid(rec), now));
         if (record) this.game.feed(this.game.vid(rec), 'tag', `${rec.name} set the sprint record: ${(ms / 1000).toFixed(2)} s`);
       }
@@ -119,7 +119,7 @@ export class Life {
     if (rec.seeds.length >= 40) return;
     this.wild.set(this.game.vid(rec), list.filter((x) => x.id !== id)); this.game.broadcast(this.game.vid(rec), { t: 'wild', remove: [id] });
     rec.seeds.push({ uid: uid('s'), speciesId: w.speciesId, tier: w.tier }); this.game.store.touch();
-    this.game.pushState(rec, { seeds: rec.seeds }); this.game.send(l.ws, { t: 'toast', text: `${UI.wildFound} ${SP.get(w.speciesId)!.name}!` });
+    this.game.pushState(rec, { seeds: rec.seeds }); this.game.send(l.ws, { t: 'toast', text: `${UI.wildFound} ${SP.get(w.speciesId)!.name}!` }); this.game.progress(rec, "forage");
   }
 
   sprintStart(l: { x: number; y: number; ws: import('ws').WebSocket; carry: unknown }, rec: PlayerRec, now: number): void {

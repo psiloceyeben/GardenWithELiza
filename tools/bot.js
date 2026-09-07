@@ -40,12 +40,14 @@ class Bot {
     const path = W.findPath(this.village, { x: this.x, y: this.y }, target, this.gateClosed);
     if (!path) { this.say(`no path to ${target.x},${target.y}`); return false; }
     for (const wp of path) {
+      let stuck = 0;
       for (let i = 0; i < 400; i++) {
         const dx = wp.x - this.x; const dy = wp.y - this.y; const d = Math.hypot(dx, dy);
         if (d < 3) break;
         const sp = P.BASE_SPEED * (this.carry ? P.CARRY_SPEED : 1) * 0.1 * 0.9;
         const step = Math.min(d, sp);
         const r = W.moveActor(this.village, this.x, this.y, (dx / d) * step, (dy / d) * step, this.gateClosed);
+        if (r.x === this.x && r.y === this.y) { if (++stuck > 5) { this.say(`stuck at ${Math.round(this.x)},${Math.round(this.y)} heading ${wp.x},${wp.y}`); return false; } } else stuck = 0;
         this.x = r.x; this.y = r.y;
         this.send({ t: 'input', dx: dx / d, dy: dy / d, x: Math.round(this.x), y: Math.round(this.y), d: 'down', f: false, m: true });
         await sleep(100);
@@ -165,6 +167,28 @@ class Bot {
   dave.send({ t: 'link', address, signature: SIG.signForTest(dnonce.message, priv).signature }); await sleep(800);
   check(!!ident && ident.id === alice.id && ident.secret && ident.secret !== alice.secret, 'wallet sign-in on a new device adopts the wallet owner (fresh secret issued)');
   dave.ws.close();
+  // town (fresh player Erin: Alice was signed out by the adoption test above): talk to Seedwife Ada, accept "Wild things", forage three, claim; ask the Oracle NPC
+  const erin = new Bot("Erin"); await erin.connect();
+  let npcMsg = null; let sayMsg = null; const origOnE = erin.on.bind(erin); erin.on = (m) => { if (m.t === "npc") npcMsg = m; if (m.t === "say") sayMsg = m; origOnE(m); };
+  for (let i = 0; i < 80 && erin.wilds.size < 3; i++) await sleep(250);
+  const ada = erin.village.npcs.find((n) => n.id === 'seedwife');
+  const walked = await erin.walkTo({ x: ada.tx * W.TILE + 16, y: (ada.ty + 1) * W.TILE + 16 });
+  erin.say(`walk to Ada ok=${walked} at ${Math.round(erin.x)},${Math.round(erin.y)}`);
+  erin.send({ t: 'talk', npc: 'seedwife' }); await sleep(400);
+  check(!!npcMsg && npcMsg.name === 'Seedwife Ada' && npcMsg.missions.some((m) => m.id === 'forage3'), 'talked to Seedwife Ada, missions offered');
+  erin.send({ t: 'mission', id: 'forage3', action: 'accept' }); await sleep(300);
+  check(erin.you.missions.active.forage3 === 0, 'accepted Wild things');
+  let got = 0;
+  for (const w of [...erin.wilds.values()].slice(0, 6)) { if (got >= 3) break; await erin.walkTo({ x: w.x, y: w.y }); erin.send({ t: 'forage', id: w.id }); await sleep(300); if (!erin.wilds.has(w.id)) got++; }
+  check(erin.you.missions.active.forage3 >= 3, `mission progress after foraging (${erin.you.missions.active.forage3})`);
+  await erin.walkTo({ x: ada.tx * W.TILE + 16, y: (ada.ty + 1) * W.TILE + 16 });
+  const sapB = erin.you.sap; erin.send({ t: 'mission', id: 'forage3', action: 'claim' }); await sleep(400);
+  check(erin.you.missions.done.forage3 && erin.you.sap >= sapB + 80 && sayMsg && sayMsg.npc === 'seedwife', 'claimed Wild things (+80 Sap, Ada replies)');
+  const orc = erin.village.npcs.find((n) => n.id === 'oracle');
+  await erin.walkTo({ x: orc.tx * W.TILE + 16, y: (orc.ty + 1) * W.TILE + 16 });
+  sayMsg = null; erin.send({ t: 'ask', npc: 'oracle', text: 'What should I plant first?' });
+  for (let i = 0; i < 80 && !sayMsg; i++) await sleep(250);
+  check(!!sayMsg && sayMsg.npc === 'oracle' && sayMsg.text.length > 0, `the Oracle NPC answered (oracle=${sayMsg && sayMsg.oracle}): ${sayMsg && sayMsg.text.slice(0, 80)}`);
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS');
-  alice.ws.close(); bob.ws.close(); process.exit(fails.length ? 1 : 0);
+  erin.ws.close(); bob.ws.close(); process.exit(fails.length ? 1 : 0);
 })();

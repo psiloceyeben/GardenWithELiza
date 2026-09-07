@@ -8,6 +8,7 @@ import { speciesById, COPY } from '../content';
 import { Net, wsUrl, loadIdentity, newIdentity, saveIdentity, type Identity } from '../net';
 import { hasWallet, connectAddress, signMessageWith } from '../wallet';
 import { BIOME_COUNT } from '@shared/derive/constants';
+import { npcById } from '@shared/missions';
 import { takeLegacySave } from '../state';
 import { Hud } from '../ui/hud';
 import { sfx } from '../audio';
@@ -72,6 +73,7 @@ export class WorldScene extends Phaser.Scene {
   villages: P.VillageInfo[] = [];
   bounties: P.Bounty[] = [];
   trophies: P.Trophies | null = null;
+  npcSprites = new Map<string, Phaser.GameObjects.Sprite>();
   wanted = new Map<string, Phaser.GameObjects.Text>();
 
   constructor() { super('world'); }
@@ -119,6 +121,12 @@ export class WorldScene extends Phaser.Scene {
     for (const p of v.props) {
       const px = p.tx * TILE + (p.w * TILE) / 2; const py = (p.ty + p.h) * TILE;
       if (p.kind.startsWith('tree')) this.add.image(px, py + 2, 'props', p.kind).setOrigin(0.5, 1).setDepth(py);
+      else if (p.kind.startsWith('bld_')) this.add.image(px, py, 'town', p.kind).setOrigin(0.5, 1).setDepth(py);
+      else if (p.kind.startsWith('npc_')) {
+        const id = p.kind.slice(4); const s = this.add.sprite(px, py - 2, 'chars', `${p.kind}0`).setOrigin(0.5, 30 / 32).setDepth(py - 2).play(p.kind);
+        this.npcSprites.set(id, s);
+        const npc = npcById(id); if (npc) this.add.text(px, py - 34, npc.name, { fontFamily: '"Press Start 2P", monospace', fontSize: '6px', color: '#ffe28a', stroke: '#000', strokeThickness: 2, resolution: 3 }).setOrigin(0.5, 1).setDepth(8000);
+      }
       else if (p.kind === 'fountain') this.add.sprite(px, py, 'plaza', 'fountain0').setOrigin(0.5, 1).setDepth(py).play('fountain');
       else if (p.kind === 'lamp') this.lamps.push(this.add.image(px, py, 'plaza', 'lamp0').setOrigin(0.5, 1).setDepth(py));
       else if (p.kind === 'track') this.add.image(px, py, 'plaza', 'track').setOrigin(0.5, 1).setDepth(1);
@@ -196,6 +204,8 @@ export class WorldScene extends Phaser.Scene {
         this.hud.banner(Date.now()); break;
       case 'nonce': void this.onNonce(m.address, m.message); break;
       case 'identity': saveIdentity({ id: m.id, secret: m.secret, name: m.name }); this.net.close(); setTimeout(() => location.reload(), 600); break;
+      case 'npc': this.hud.talk(m.npc, m.name, m.line, m.missions); break;
+      case 'say': this.hud.say(m.name, m.text); { const s = this.npcSprites.get(m.npc); if (s) this.bubbleAt(s.x, s.y - 34, m.text.slice(0, 60)); } break;
       case 'linked': if (this.you) { this.you.land = m.land; this.you.plotCount = m.plotCount; this.you.rarityFloor = m.rarityFloor; } this.hud.refresh(); if (m.address) this.hud.open('land'); break;
       case 'pong': break;
     }
@@ -227,6 +237,10 @@ export class WorldScene extends Phaser.Scene {
     set(speciesId ? this.add.image(host.x, host.y - 30, 'plants', `${speciesId}_grow3`).setOrigin(0.5, 44 / 48).setDepth(host.depth + 1) : null);
   }
 
+  bubbleAt(x: number, y: number, text: string): void {
+    const t = this.add.text(x, y, text, { fontFamily: '"Press Start 2P", monospace', fontSize: '6px', color: '#fff', backgroundColor: '#181220', padding: { x: 3, y: 2 }, wordWrap: { width: 140 }, align: 'center', resolution: 3 }).setOrigin(0.5, 1).setDepth(8500);
+    this.time.delayedCall(5000, () => t.destroy());
+  }
   bubble(id: string, text: string): void {
     const mine = id === this.you?.id;
     const host = mine ? this.player : this.remotes.get(id)?.sprite; if (!host) return;
@@ -535,6 +549,14 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     const v = this.village!;
+    for (const n of v.npcs) {
+      const nx = n.tx * TILE + 16; const ny = n.ty * TILE + 16;
+      if (Math.abs(nx - x) <= 18 && Math.abs(ny - y) <= 24) {
+        const act = () => this.net.send({ t: 'talk', npc: n.id });
+        if (Math.hypot(nx - this.player.x, ny - this.player.y) < 56) act(); else this.goTo({ x: nx, y: ny + TILE }, act);
+        return;
+      }
+    }
     if (Math.abs(x - (v.conveyor.tx * TILE + 32)) < 40 && Math.abs(y - (v.conveyor.ty * TILE)) < 32) { this.hud.open('conveyor'); return; }
     if (Math.abs(x - (v.board.tx * TILE + 32)) < 36 && Math.abs(y - (v.board.ty * TILE)) < 32) { this.hud.open('feed'); return; }
     const sign = v.props.find((p) => p.kind === 'sign');
@@ -550,6 +572,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   interactNearest(): void {
+    for (const npc of this.village!.npcs) if (Math.hypot(npc.tx * TILE + 16 - this.player.x, npc.ty * TILE + 16 - this.player.y) < 56) { this.net.send({ t: 'talk', npc: npc.id }); return; }
     const w = this.nearestWild(); const n = this.nearestPlot();
     if (w && (!n || w.d < Math.hypot(n.pos.x - this.player.x, n.pos.y - this.player.y))) { this.net.send({ t: 'forage', id: w.w.id }); sfx.forage(); return; }
     if (n) this.interactPlot(n.view, n.i);
@@ -584,6 +607,8 @@ export class WorldScene extends Phaser.Scene {
     this.selectedSeed = uid; this.hud.close(); this.hud.toast(COPY.plantPrompt, 4000);
   }
   cosmetic(item: P.CosmeticItem): void { this.net.send({ t: 'cosmetic', item }); sfx.buy(); }
+  mission(id: string, action: 'accept' | 'claim'): void { this.net.send({ t: 'mission', id, action }); if (action === 'claim') sfx.fanfare(); else sfx.tend(); }
+  ask(npc: string, text: string): void { this.net.send({ t: 'ask', npc, text }); }
   wardrobe(shirt?: number, hat?: number): void { this.net.send({ t: 'wardrobe', shirt, hat }); sfx.buy(); }
   nick(plotId: number, name: string): void { this.net.send({ t: 'nick', plotId, name }); }
   visit(villageId: string): void { this.net.send({ t: 'visit', village: villageId }); this.hud.close(); }
