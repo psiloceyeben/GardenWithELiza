@@ -12,54 +12,79 @@
     html, body { margin:0; height:100%; background:var(--ink); color:var(--text); font-family:'Press Start 2P', monospace; font-size:10px; overflow:hidden; touch-action:none; }
     #game { position:fixed; inset:0; }
     #game canvas { image-rendering:pixelated; image-rendering:crisp-edges; }
-    button { font-family:inherit; font-size:10px; color:var(--text); background:var(--panel2); border:2px solid var(--edge); padding:8px 10px; cursor:pointer; box-shadow:2px 2px 0 #000; }
+    button { font-family:inherit; font-size:9px; color:var(--text); background:var(--panel2); border:2px solid var(--edge); padding:7px 8px; cursor:pointer; box-shadow:2px 2px 0 #000; }
     button:active { transform:translate(1px,1px); box-shadow:1px 1px 0 #000; }
     button:disabled { opacity:.45; cursor:default; }
-    #hud { position:fixed; top:8px; left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:8px 10px; line-height:1.8; pointer-events:none; }
+    input { font-family:inherit; font-size:9px; color:var(--text); background:#120c18; border:2px solid var(--edge); padding:7px 8px; outline:none; }
+    #hud { position:fixed; top:8px; left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:7px 9px; line-height:1.8; pointer-events:none; max-width:46vw; }
     #hud .sap { color:var(--sap); }
-    #hud .dim { color:var(--dim); font-size:8px; }
-    #bar { position:fixed; bottom:calc(8px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); display:flex; gap:6px; }
-    #panel { position:fixed; left:50%; bottom:calc(52px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(96vw,560px); max-height:70vh; overflow:auto; background:var(--panel); border:3px solid var(--edge); box-shadow:4px 4px 0 #000; padding:10px; }
+    #hud .dim { color:var(--dim); font-size:7px; }
+    #carry { color:#ff8080; font-size:7px; }
+    #feed { position:fixed; top:8px; right:8px; width:min(44vw,300px); pointer-events:none; font-size:7px; line-height:1.6; }
+    .fe { background:rgba(24,18,32,.85); border-left:3px solid var(--edge); padding:4px 6px; margin-bottom:3px; }
+    .fe-steal { border-color:#ff5555; } .fe-tag { border-color:#6cd46c; } .fe-gate, .fe-break { border-color:var(--sap); } .fe-reveal { border-color:#c26bff; } .fe-join { border-color:#8fc3ff; }
+    #chatlog { position:fixed; left:8px; bottom:calc(58px + env(safe-area-inset-bottom)); font-size:7px; line-height:1.7; pointer-events:none; max-width:60vw; }
+    #chatlog div { background:rgba(24,18,32,.8); padding:3px 6px; margin-top:2px; }
+    #chatlog b { color:var(--sap); }
+    #chat { position:fixed; left:8px; bottom:calc(30px + env(safe-area-inset-bottom)); width:min(60vw,260px); opacity:.6; }
+    #chat:focus { opacity:1; }
+    #bar { position:fixed; bottom:calc(6px + env(safe-area-inset-bottom)); right:8px; display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+    #panel { position:fixed; left:50%; bottom:calc(48px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(96vw,560px); max-height:66vh; overflow:auto; background:var(--panel); border:3px solid var(--edge); box-shadow:4px 4px 0 #000; padding:10px; z-index:5; }
     #panel[hidden] { display:none; }
-    #panel h2 { margin:0 0 8px; font-size:11px; display:flex; justify-content:space-between; align-items:center; }
+    #panel h2 { margin:0 0 8px; font-size:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
     #panel h2 button { padding:4px 8px; }
     .slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
     .slot { background:var(--panel2); border:2px solid #000; padding:6px; display:grid; grid-template-columns:36px 1fr; gap:6px; align-items:center; }
     .slot.sold { opacity:.4; }
     .icon { width:32px; height:48px; background-image:url('sprites/plants.png'); background-repeat:no-repeat; image-rendering:pixelated; }
-    .slot .name { font-size:8px; line-height:1.5; }
+    .slot .name, .item .name { font-size:8px; line-height:1.5; }
     .slot .tier { font-size:7px; }
-    .slot .buy { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; }
-    .price { color:var(--sap); }
+    .slot .buy, .item .buy { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; gap:6px; }
+    .item { background:var(--panel2); border:2px solid #000; padding:6px; margin-bottom:6px; display:grid; gap:4px; }
+    .price { color:var(--sap); font-size:8px; }
     .seeds { display:flex; flex-wrap:wrap; gap:8px; }
     .seed { background:var(--panel2); border:2px solid #000; padding:6px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; width:100px; font-size:7px; text-align:center; }
     .seed.sel { border-color:var(--sap); }
     .row { display:flex; justify-content:space-between; padding:3px 0; font-size:8px; }
-    .note { color:var(--dim); font-size:7px; line-height:1.6; margin-top:8px; }
-    #toast { position:fixed; top:8px; left:50%; transform:translateX(-50%); background:rgba(24,18,32,.92); border:2px solid var(--edge); padding:8px 12px; font-size:8px; max-width:80vw; text-align:center; transition:opacity .3s; opacity:0; pointer-events:none; line-height:1.6; }
+    .note { color:var(--dim); font-size:7px; line-height:1.6; margin-top:4px; }
+    .emotes { display:flex; gap:8px; flex-wrap:wrap; } .emotes button { font-size:18px; }
+    #toast { position:fixed; top:64px; left:50%; transform:translateX(-50%); background:rgba(24,18,32,.92); border:2px solid var(--edge); padding:8px 12px; font-size:8px; max-width:70vw; text-align:center; transition:opacity .3s; opacity:0; pointer-events:none; line-height:1.6; z-index:6; }
     #toast.on { opacity:1; }
-    #modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; }
-    #modal[hidden] { display:none; }
-    #modal .card { background:var(--panel); border:3px solid var(--sap); box-shadow:6px 6px 0 #000; padding:16px; width:min(92vw,360px); text-align:center; }
-    #modal .card .icon { margin:8px auto 60px; transform:scale(2); transform-origin:center top; }
-    #modal .card h3 { font-size:11px; margin:6px 0; line-height:1.6; }
-    #modal .card p { font-size:8px; margin:4px 0; line-height:1.7; }
+    #modal, #name-modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:10; }
+    #modal[hidden], #name-modal[hidden] { display:none; }
+    .card { background:var(--panel); border:3px solid var(--sap); box-shadow:6px 6px 0 #000; padding:16px; width:min(92vw,360px); text-align:center; }
+    .card .icon { margin:8px auto 60px; transform:scale(2); transform-origin:center top; }
+    .card h3 { font-size:11px; margin:6px 0; line-height:1.6; }
+    .card p { font-size:8px; margin:4px 0; line-height:1.7; }
+    .card input { width:100%; margin:10px 0; text-align:center; }
+    #joy { position:fixed; left:14px; bottom:calc(90px + env(safe-area-inset-bottom)); width:96px; height:96px; border-radius:50%; background:rgba(24,18,32,.5); border:2px solid var(--edge); z-index:4; }
+    #joy[hidden], #act[hidden] { display:none; }
+    #joy-knob { position:absolute; left:28px; top:28px; width:36px; height:36px; border-radius:50%; background:var(--edge); pointer-events:none; }
+    #act { position:fixed; right:14px; bottom:calc(90px + env(safe-area-inset-bottom)); width:64px; height:64px; border-radius:50%; font-size:14px; z-index:4; }
     .t-common{color:#c8c8c8}.t-uncommon{color:#6cd46c}.t-rare{color:#4aa3ff}.t-epic{color:#c26bff}.t-legendary{color:#ffb02e}.t-mythic{color:#ff4d6d}
     .m-golden{color:#ffd24a}.m-holographic{color:#8ff}.m-colossal{color:#f8a}.m-feral{color:#8f8}.m-backwards{color:#aaf}.m-screaming{color:#f55}
   </style>
 </head>
 <body>
   <div id="game"></div>
-  <div id="hud"><div><span class="sap" id="sap">0</span> <span class="dim">Sap</span></div><div class="dim"><span id="sps">0</span> Sap/s · <span id="plots">0/6</span> plots</div></div>
+  <div id="hud"><div><span class="sap" id="sap">0</span> <span class="dim">Sap</span> <span class="dim"><span id="sps">0</span>/s · <span id="plots">0/6</span></span></div><div class="dim" id="village"></div><div id="carry" hidden></div></div>
+  <div id="feed"></div>
   <div id="toast"></div>
+  <div id="chatlog"></div>
+  <input id="chat" maxlength="80" autocomplete="off" />
+  <div id="joy" hidden><div id="joy-knob"></div></div>
+  <button id="act" hidden>E</button>
   <div id="bar">
-    <button data-panel="conveyor" id="btn-conveyor">Seeds</button>
+    <button data-panel="conveyor" id="btn-conveyor">Conveyor</button>
     <button data-panel="seeds" id="btn-seeds">Bag</button>
-    <button data-panel="shop" id="btn-shop">Sprint</button>
+    <button data-panel="shop" id="btn-shop">Shop</button>
+    <button data-panel="feed" id="btn-feed">Feed</button>
+    <button data-panel="emotes" id="btn-emotes">Emotes</button>
     <button data-panel="odds" id="btn-odds">Odds</button>
   </div>
   <div id="panel" hidden><h2><span id="panel-title"></span><button id="panel-close">X</button></h2><div id="panel-body"></div></div>
   <div id="modal" hidden><div class="card" id="modal-card"></div></div>
+  <div id="name-modal" hidden><div class="card"><h3 id="name-title"></h3><input id="name-input" maxlength="16" autocomplete="off" /><button id="name-go"></button></div></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

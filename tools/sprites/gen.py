@@ -627,15 +627,10 @@ def main(out):
         for fr in range(2): plant_frames.append((f"{sid}_wither{fr}", draw_plant(sid, 4, fr * 3, wither=True)))
     plants_im = pack(plant_frames, 32, 48, 13, 'plants', out)
 
-    tiles = [(k, tile(k, i + 1)) for i, k in enumerate(['grass', 'grass2', 'soil', 'plot', 'path', 'hedge', 'water', 'stone'])]
-    pack(tiles, 32, 32, 8, 'tiles', out)
-
-    chars = []
-    for d in ('down', 'up', 'side'):
-        for fr in range(2): chars.append((f"farmer_{d}{fr}", farmer(d, fr)))
-    for fr in range(2): chars.append((f"farmer_carry{fr}", farmer('down', fr, carry=True)))
-    for fr in range(3): chars.append((f"gnome{fr}", gnome(fr)))
-    pack(chars, 32, 32, 8, 'chars', out)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import gen_world
+    ntiles, nbiomes, nchars, nplaza = gen_world.build(out)
+    tiles = list(range(ntiles)); chars = list(range(nchars))
 
     props = [(k, prop(k)) for k in ('fence_full', 'fence_dmg', 'fence_broken', 'gate', 'sprinkler0', 'sprinkler1', 'lock', 'conveyor0', 'conveyor1', 'stump', 'mound', 'shield')]
     props += [(f"tree{s}", tree(s)) for s in range(5)]
