@@ -131,7 +131,7 @@ export type ServerMsg =
   | { t: 'snap'; now: number; p: SnapPlayer[] }
   | { t: 'correction'; x: number; y: number } // rejected prediction; applies even below ordinary snapshot tolerance
   | { t: 'state'; you: Partial<PrivateState> }
-  | { t: 'lot'; lot: PublicLot }
+  | { t: 'lot'; lot: PublicLot; removed?: boolean }   // removed: the owner was a guest who left; clear their garden
   | { t: 'players'; names: Record<string, NameEntry>; left?: string[] }
   | { t: 'feed'; e: FeedEvent }
   | { t: 'reveal'; plant: Plant }

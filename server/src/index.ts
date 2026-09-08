@@ -94,6 +94,8 @@ wss.on('connection', (ws: WebSocket) => {
 
 async function start(): Promise<void> {
   await game.initialize();
+  game.purgeStaleGuests();          // only wallet-linked gardens survive a restart
+  await game.commit().catch(() => undefined);
   const timers = [
     setInterval(() => { const now = Date.now(); for (const lifecycle of socketLifecycles.values()) lifecycle.check(now); }, 5000),
     setInterval(() => { if (!stopping && !game.store.failed) try { game.tick(Date.now()); } catch { console.error('tick failed'); } }, P.TICK_MS),

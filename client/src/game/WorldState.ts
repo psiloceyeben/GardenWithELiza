@@ -187,10 +187,12 @@ export class WorldState {
         break;
       case "lot":
         if (this.village) {
-          this.lots.set(m.lot.ownerId, {
-            lot: m.lot,
-            geo: this.village.lots[m.lot.lotId],
-          });
+          if (m.removed) this.lots.delete(m.lot.ownerId);
+          else
+            this.lots.set(m.lot.ownerId, {
+              lot: m.lot,
+              geo: this.village.lots[m.lot.lotId],
+            });
           this.revision++;
         }
         break;

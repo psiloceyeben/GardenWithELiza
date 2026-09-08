@@ -195,7 +195,7 @@ export class WorldScene extends Phaser.Scene {
         break;
       }
       case 'state': if (this.you) { Object.assign(this.you, m.you); this.hud.refresh(); } break;
-      case 'lot': this.applyLot(m.lot); break;
+      case 'lot': if (m.removed) this.removeLot(m.lot.ownerId); else this.applyLot(m.lot); break;
       case 'players': for (const [id, n] of Object.entries(m.names)) this.names.set(id, n); for (const id of m.left ?? []) { const r = this.remotes.get(id); if (r) { this.destroyRemote(r); this.remotes.delete(id); } } this.hud.refresh(); break;
       case 'feed': this.feed.unshift(m.e); if (this.feed.length > 40) this.feed.length = 40; this.hud.feedRender(); if (m.e.kind === 'steal' || m.e.kind === 'tag') sfx.buy(); break;
       case 'reveal': { const sp = speciesById(m.plant.speciesId); sfx.reveal(E.tierIndex(m.plant.tier)); this.cameras.main.flash(200, 255, 240, 200); this.hud.reveal(m.plant, sp); break; }
@@ -268,6 +268,18 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------ lots
+  /** A guest owner left and was purged: tear their garden down. */
+  removeLot(ownerId: string): void {
+    const v = this.lots.get(ownerId); if (!v) return;
+    for (const [i, s] of v.plants) { s.destroy(); this.clearFx(v, i); }
+    v.plants.clear();
+    for (const o of v.locks.values()) o.destroy(); v.locks.clear();
+    for (const o of v.landObjs) { this.lamps = this.lamps.filter((x) => x !== o); o.destroy(); }
+    (v.gnome?.getData('hat') as Phaser.GameObjects.Image | undefined)?.destroy();
+    v.gnome?.destroy(); v.sprinkler?.destroy(); v.sign.destroy();
+    this.lots.delete(ownerId);
+  }
+
   applyLot(l: PublicLot): void {
     const v = this.village!; const geo = v.lots[l.lotId];
     let view = this.lots.get(l.ownerId);

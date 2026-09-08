@@ -25,6 +25,9 @@ const MUT = copyJson.mutations as Record<string, string>;
 const UI = copyJson.ui as Record<string, string>;
 const DEFAULT_PLOTS = 10; // Ben 2026-09-07: ten empty plots to start; existing players are raised to this on login (land never shrinks)
 const GRACE_MS = Number(process.env.PONS_GRACE_MS ?? P.GRACE_MS);
+// How long a departed guest's garden survives so a reload or dropped connection can return to it.
+// After that it is deleted and the lot freed: only wallet-linked gardens persist (Ben, 2026-09-08).
+const GUEST_TTL_MS = Number(process.env.PONS_GUEST_TTL_MS ?? 3 * 60_000);
 
 export interface PlayerRec {
   id: string; secret: string; name: string; color: number;
@@ -68,6 +71,7 @@ export class Game {
   villages = new Map<string, VillageRec>();
   maps = new Map<string, Village>();
   live = new Map<string, Live>();
+  guestPurges = new Map<string, ReturnType<typeof setTimeout>>();
   private walletRevision = new WeakMap<Live, number>();
   private movementBudgets = new WeakMap<Live, MovementBudget>();
   feeds = new Map<string, FeedEvent[]>();
@@ -284,6 +288,7 @@ export class Game {
     const now = Date.now();
     const id = String(m.id).replace(/[^a-z0-9]/gi, '').slice(0, 32); const secret = String(m.secret).slice(0, 64);
     if (id.length < 8 || secret.length < 8) { this.send(ws, { t: 'error', text: 'bad identity' }); return null; }
+    this.cancelGuestPurge(id);   // they came back inside the grace window
     let rec = this.players.get(id);
     if (rec && rec.secret !== secret) {
       try { ws.close(P.IDENTITY_REJECTED_CLOSE,'sign-in rejected'); } catch { /* already closed */ }
@@ -433,6 +438,47 @@ export class Game {
     this.live.delete(id);
     rec.lastSeen = Date.now(); this.store.touch();
     if (!silent) { this.broadcast(this.vid(rec), { t: 'players', names: {}, left: [id] }); this.pushLot(rec); }
+    if (!rec.address) this.scheduleGuestPurge(id);
+  }
+
+  // ------------------------------------------------------------ ephemeral guest gardens
+  scheduleGuestPurge(id: string): void {
+    this.cancelGuestPurge(id);
+    const timer = setTimeout(() => { this.guestPurges.delete(id); try { this.purgeGuest(id); } catch (e) { console.error('purgeGuest', e); } }, GUEST_TTL_MS);
+    if (typeof timer.unref === 'function') timer.unref();
+    this.guestPurges.set(id, timer);
+  }
+  cancelGuestPurge(id: string): void {
+    const t = this.guestPurges.get(id); if (t) { clearTimeout(t); this.guestPurges.delete(id); }
+  }
+  /** Delete a departed guest's record and free their lot. Never touches a wallet-linked player. */
+  purgeGuest(id: string): void {
+    const rec = this.players.get(id);
+    if (!rec || rec.address || this.live.has(id)) return;   // linked, or they came back
+    const villageId = rec.villageId; const now = Date.now();
+    const lotMsg: ServerMsg = { t: 'lot', lot: this.publicLot(rec, now), removed: true };
+    const village = this.villages.get(villageId);
+    if (village && village.lots[rec.lotId] === id) village.lots[rec.lotId] = null;
+    if (village?.bounties?.length) village.bounties = village.bounties.filter((b) => b.thiefId !== id);
+    for (const other of this.players.values()) {
+      if (other.stolenBy?.some((t) => t.id === id)) other.stolenBy = other.stolenBy.filter((t) => t.id !== id);
+    }
+    this.players.delete(id);
+    this.store.touch();
+    this.broadcast(villageId, lotMsg);
+    this.broadcast(villageId, this.boardMsg(villageId, now));
+    console.log(`guest purged: ${id} (${rec.name}) — lot ${rec.lotId} in ${villageId} freed`);
+  }
+  /** Startup sweep: guests left over from a previous run are gone the moment we boot. */
+  purgeStaleGuests(): void {
+    let n = 0;
+    for (const [id, rec] of [...this.players]) {
+      if (rec.address) continue;
+      const village = this.villages.get(rec.villageId);
+      if (village && village.lots[rec.lotId] === id) village.lots[rec.lotId] = null;
+      this.players.delete(id); n += 1;
+    }
+    if (n) { this.store.touch(); console.log(`startup: purged ${n} guest garden(s) — only wallet-linked gardens persist`); }
   }
 
   // ------------------------------------------------------------ messages
