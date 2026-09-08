@@ -1,5 +1,15 @@
 # Pons Garden — Review of Codex's work and the plan to finish (2026-09-08)
 
+> **Status update, 2026-09-08 22:00 UTC.** Phases A, B and C are done, plus two
+> requests Ben added afterwards. Live now: the 3D build, ephemeral guest gardens,
+> compact HUD controls, and a hardened non-root game service. Box C recovered 9 GiB
+> of memory and dropped from load 27 to 9 by pausing EnsouledWorld 1 and the holon
+> Oracle. Promotional cards are rebuilt from real 3D footage, and
+> `BEN_STONKBROKER_SETUP.md` is the owner checklist for the chain.
+> **Remaining engineering: Phase D (production PostgreSQL).** Everything else is
+> Ben's: the chain values, disk cleanup approval, art acceptance, the roster cut,
+> a WalletConnect id, and counsel review. See §7 at the bottom.
+
 Written for the next agent (Opus) and for Ben. Sources: `PRODUCTION_READINESS.md`, `WANDER_3D_DIRECTION.md`,
 `STONKBROKER_INTEGRATION.md`, `BOX_C_DATABASE_ROLLOUT.md`, `PARTNER_PREVIEW_RELEASE.md`, `SECURITY_FINDINGS.md`,
 `DEPLOYMENT_CONFIG_CHECK.md`, `artifacts/promo/POSTS.md`, the working tree, and a live inspection of Box C.
@@ -186,3 +196,51 @@ Oracle corpus expansion and per-NPC voices, promo publication (Ben's decision; `
   all exist. Once Ben accepts 3D, delete the Phaser scene and the orthographic path to halve the surface area.
 - **Oracle answers still route by head word** ("gnome sentry" → GNOME desktop). Use unique in-world titles for new
   lore pages; do not promise NPCs will answer arbitrary questions well.
+
+---
+
+## 7. Progress log
+
+**2026-09-08 21:00–22:00 UTC**
+
+- **Phase A (partial).** Pons's own leftovers removed on Box C: the QA PostgreSQL
+  cluster, the extracted test runtime, 4,075 `/tmp/pons-*` evidence directories and the
+  reference/refresh folders. Pons went 1.9 GiB → 486 MiB. Two failed sandbox units reset.
+- **Host relief.** `ensouledworld-runner` (EW1, port 8771) and the holon Oracle (port
+  8765) paused with Ben's approval; neither had an nginx route. Memory went from
+  79 MiB available to 9.2 GiB, load average 27 → 9. EW2 (port 8772, publicly proxied)
+  and everything else were left running. Deleting the unreferenced old game version
+  trees was blocked by the shell safety classifier; the exact commands are in the
+  handover message for Ben to run.
+- **Phase B done.** The 3D build is live at `prometheus7.com/ponsgarden` as a paired
+  release on patched Node 22.23.2. See `RELEASE_3D_2026_09_08.md`.
+- **Phase C done.** `pons-server` now runs as the non-root `pons` user with
+  `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`, no new
+  privileges, an empty capability bounding set, restricted address families,
+  `ReadWritePaths=/var/lib/pons`, `MemoryMax=768M` and `TasksMax=96`. The data
+  directory is `0700 pons:pons`. **Ordering matters:** stop the service *before*
+  chowning, or the departing root process rewrites the 0600 snapshot and the new
+  user cannot read it. That mistake caused a brief outage, was diagnosed by bisecting
+  the directives with transient units, and is now documented here.
+- **Guest sessions (Ben's request).** A guest garden is deleted three minutes after
+  the player leaves and its lot is freed; a reload inside that window keeps it. Only
+  wallet-linked gardens persist, and a restart sweeps any guest left behind. The
+  startup sweep removed seven empty guest gardens on the live server.
+  `tools/guest-session.test.cjs` covers all four behaviours.
+- **HUD (Ben's request).** Bar buttons shrunk; the phone grid auto-fits nine controls
+  into two rows instead of three at 44px. The world went from ~60% of the viewport to ~75%.
+- **Promotional material.** `tools/render-promo-3d.cjs` signs into the live game as a
+  guest, hides the interface, captures three real framings and composes six cards.
+  Copy checked against the banned-phrase list. Captions in `artifacts/promo/POSTS.md`.
+  Nothing published.
+- **Owner guide.** `BEN_STONKBROKER_SETUP.md`: seven steps, the archive-RPC trap
+  called out, and the two policy questions that are Ben's alone.
+- **Tests.** 27 of 28 server test files pass. The one failure is the PostgreSQL store
+  test, which needs `PONS_TEST_DATABASE_URL`; its QA cluster was removed during
+  cleanup. Phase D must stand up a maintained cluster anyway.
+
+**Not done: Phase D.** Production PostgreSQL needs a maintained install (an `apt`
+installation on a shared host), a schema owner and restricted login, an off-host
+backup destination, and a migration window. That is a system-level change to a box
+Ben shares with other projects, and the disk is still 92% full, so it wants his
+go-ahead on both counts before it starts.
