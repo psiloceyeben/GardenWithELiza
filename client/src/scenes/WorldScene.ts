@@ -164,6 +164,7 @@ export class WorldScene extends Phaser.Scene {
         const me = m.players.find((p) => p.id === m.you.id);
         if (!this.player) this.spawnPlayer(m.you, me?.x ?? this.village!.spawn.x, me?.y ?? this.village!.spawn.y);
         else if (me) { this.player.setPosition(me.x, me.y); }
+        if (this.zoomLevel !== 2) this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
         for (const p of m.players) if (p.id !== m.you.id) this.applySnap(p);
         this.ready = true; this.hud.refresh(); this.hud.feedRender();
         if (this.pendingWallet) { const w = this.pendingWallet; this.pendingWallet = null; void this.connectWallet(w); }
@@ -381,12 +382,20 @@ export class WorldScene extends Phaser.Scene {
     catch { this.hud.toast(COPY.linkFail, 4000); }
     finally { this.linking = false; }
   }
-  /** Map zoom: 1 → 0.5 → 0.25 → 1. The HUD is DOM so it stays crisp. */
+  /** Zoom: close (follows you) → half (follows you) → whole map (fixed) → close. The HUD is DOM so it stays crisp. */
   zoomLevel = 0;
   toggleZoom(): void {
-    const levels = [1, 0.5, 0.25]; this.zoomLevel = (this.zoomLevel + 1) % levels.length; const z = levels[this.zoomLevel];
-    this.cameras.main.setZoom(z);
-    this.night.setSize(640 / z, 360 / z).setPosition(0, 0);
+    this.zoomLevel = (this.zoomLevel + 1) % 3;
+    const cam = this.cameras.main;
+    if (this.zoomLevel === 2) {
+      const z = Math.min(640 / (VILLAGE_W * TILE), 360 / (VILLAGE_H * TILE));
+      cam.stopFollow(); cam.setZoom(z); cam.centerOn((VILLAGE_W * TILE) / 2, (VILLAGE_H * TILE) / 2);
+      this.night.setSize(640 / z, 360 / z);
+    } else {
+      const z = this.zoomLevel === 0 ? 1 : 0.5;
+      cam.setZoom(z); cam.startFollow(this.player, true, 0.2, 0.2);
+      this.night.setSize(640 / z, 360 / z);
+    }
   }
   unlinkWallet(): void { this.net.send({ t: 'unlink' }); }
 

@@ -5,12 +5,14 @@
 import bannedJson from '../../shared/banned-copy.json';
 import type { Npc } from '../../shared/missions';
 
-const URL = process.env.PONS_ORACLE_URL ?? 'http://127.0.0.1:8097/chat';
-const TIMEOUT_MS = Number(process.env.PONS_ORACLE_TIMEOUT_MS ?? 15_000);
+const URL = process.env.PONS_ORACLE_URL ?? 'http://127.0.0.1:8099/chat';
+const PERSONA = process.env.PONS_ORACLE_PERSONA === '1';   // the general Oracle (:8097) tolerates a persona wrapper; the lore instance parses plain questions best
+const TIMEOUT_MS = Number(process.env.PONS_ORACLE_TIMEOUT_MS ?? 20_000);
 const banned = (bannedJson.patterns as string[]).map((p) => new RegExp(p, 'i'));
 let inflight = 0;
 
 export function frame(npc: Npc, village: string, player: string, question: string): string {
+  if (!PERSONA) return question;
   return `${npc.name}, ${npc.role}, in the village ${village} of Pons Garden, a garden game where plants can be stolen. A gardener named ${player} asks: "${question}" Reply as ${npc.name} in at most two short sentences.`;
 }
 
@@ -24,8 +26,9 @@ export async function ask(prompt: string): Promise<OracleReply | null> {
     const res = await fetch(URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: prompt }), signal: ctl.signal });
     if (!res.ok) return null;
     const j = await res.json() as { response?: string; status?: string; text?: string };
-    const raw = String(j.response ?? j.text ?? '').replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim();
-    const withheld = j.status === 'withheld' || !raw;
+    let raw = String(j.response ?? j.text ?? '').replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim();
+    raw = raw.replace(/^(According to|The page for) [^,:]{1,40}[,:] /i, '').replace(/^[A-Z][\w' ]{1,30} (notes|records) that /i, '');   // drop the citation preamble; the NPC is the voice
+    const withheld = j.status === 'withheld' || j.status === 'clarification' || !raw;
     let text = raw.slice(0, 280);
     if (banned.some((re) => re.test(text))) return { text: '', withheld: true };   // never let generated text breach I-4
     return { text, withheld };

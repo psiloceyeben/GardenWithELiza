@@ -19,7 +19,7 @@ export class Hud {
   private touch = matchMedia('(pointer: coarse)').matches;
 
   constructor(private scene: WorldScene) {
-    for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('#bar button'))) {
+    for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('#bar button[data-panel]'))) {
       b.addEventListener('click', () => { const id = b.dataset.panel as PanelId; this.open_ === id ? this.close() : this.open(id); });
     }
     $('panel-close').addEventListener('click', () => this.close());
