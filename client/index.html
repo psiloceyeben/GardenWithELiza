@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>Pons Garden</title>
+  <title>Pons Garden — Development Preview</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
   <style>
@@ -31,6 +31,9 @@
     #bar { position:fixed; bottom:calc(6px + env(safe-area-inset-bottom)); right:8px; display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
     #panel { position:fixed; left:50%; bottom:calc(48px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(96vw,560px); max-height:66vh; overflow:auto; background:var(--panel); border:3px solid var(--edge); box-shadow:4px 4px 0 #000; padding:10px; z-index:5; }
     #panel[hidden] { display:none; }
+    /* Avoid incorrect opaque-overlay occlusion over CSS-scaled WebGL canvases
+       in Chromium. Fractional opacity keeps this panel on a blended layer. */
+    #panel { opacity:.999; }
     #panel h2 { margin:0 0 8px; font-size:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
     #panel h2 button { padding:4px 8px; }
     .slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
@@ -56,6 +59,16 @@
     #banner[hidden] { display:none; }
     #toast { position:fixed; top:64px; left:50%; transform:translateX(-50%); background:rgba(24,18,32,.92); border:2px solid var(--edge); padding:8px 12px; font-size:8px; max-width:70vw; text-align:center; transition:opacity .3s; opacity:0; pointer-events:none; line-height:1.6; z-index:6; }
     #toast.on { opacity:1; }
+    /* Natural-height rows prevent feed/event/notice collisions at every width,
+       including desktop feeds that grow to several wrapped entries. */
+    #status-stack { position:fixed; top:calc(8px + env(safe-area-inset-top)); left:8px; right:8px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; pointer-events:none; z-index:6; }
+    #status-stack > #hud, #status-stack > #feed, #status-stack > #banner, #status-stack > #toast { position:static; transform:none; min-width:0; max-width:100%; overflow-wrap:anywhere; }
+    #status-stack > #hud { align-self:start; justify-self:start; width:fit-content; }
+    #status-stack > #feed { align-self:start; justify-self:end; width:min(100%,300px); }
+    #status-stack > #banner, #status-stack > #toast { grid-column:1 / -1; justify-self:center; width:fit-content; max-width:min(100%,900px); }
+    @media (max-width:600px) {
+      #status-stack > #feed .fe:not(:first-child) { display:none; }
+    }
     #modal, #name-modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:10; }
     #modal[hidden], #name-modal[hidden] { display:none; }
     .card { background:var(--panel); border:3px solid var(--sap); box-shadow:6px 6px 0 #000; padding:16px; width:min(92vw,360px); text-align:center; }
@@ -67,16 +80,26 @@
     #joy[hidden], #act[hidden] { display:none; }
     #joy-knob { position:absolute; left:28px; top:28px; width:36px; height:36px; border-radius:50%; background:var(--edge); pointer-events:none; }
     #act { position:fixed; right:14px; bottom:calc(90px + env(safe-area-inset-bottom)); width:64px; height:64px; border-radius:50%; font-size:14px; z-index:4; }
+    @media (max-width:600px) {
+      #bar { left:8px; right:8px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:44px; gap:4px; z-index:5; }
+      #bar button { min-width:0; font-size:7px; padding:6px 4px; line-height:1.5; }
+      #chat { bottom:calc(152px + env(safe-area-inset-bottom)); width:calc(100% - 16px); height:32px; }
+      #chatlog { bottom:calc(192px + env(safe-area-inset-bottom)); }
+      #panel { bottom:calc(192px + env(safe-area-inset-bottom)); max-height:clamp(100px,calc(100dvh - 400px),56vh); }
+      #joy, #act { bottom:calc(196px + env(safe-area-inset-bottom)); }
+    }
     .t-common{color:#c8c8c8}.t-uncommon{color:#6cd46c}.t-rare{color:#4aa3ff}.t-epic{color:#c26bff}.t-legendary{color:#ffb02e}.t-mythic{color:#ff4d6d}
     .m-golden{color:#ffd24a}.m-holographic{color:#8ff}.m-colossal{color:#f8a}.m-feral{color:#8f8}.m-backwards{color:#aaf}.m-screaming{color:#f55}
   </style>
 </head>
 <body>
   <div id="game"></div>
-  <div id="hud"><div><span class="sap" id="sap">0</span> <span class="dim">Sap</span> <span class="dim"><span id="sps">0</span>/s · <span id="plots">0/6</span></span></div><div class="dim" id="village"></div><div id="carry" hidden></div></div>
+  <div id="status-stack">
+  <div id="hud"><div class="dim">DEVELOPMENT PREVIEW</div><div><span class="sap" id="sap">0</span> <span class="dim">Sap</span> <span class="dim"><span id="sps">0</span>/s · <span id="plots">0/6</span></span></div><div class="dim" id="village"></div><div id="carry" hidden></div></div>
   <div id="feed"></div>
   <div id="banner" hidden></div>
   <div id="toast"></div>
+  </div>
   <div id="chatlog"></div>
   <input id="chat" maxlength="80" autocomplete="off" />
   <div id="joy" hidden><div id="joy-knob"></div></div>

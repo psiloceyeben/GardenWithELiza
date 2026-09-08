@@ -5,16 +5,21 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server/src/index.js",
-    "test": "node dist/server/src/tests/derive.test.js"
+    "test": "node dist/server/src/tests/derive.test.js",
+    "test:persistence": "node dist/server/src/tests/store.test.js",
+    "test:chain": "node --test dist/server/src/tests/chain.test.js dist/server/src/tests/broker.test.js",
+    "test:wallet": "node --test dist/server/src/tests/wallet-race.test.js"
   },
   "dependencies": {
     "@noble/curves": "^1.6.0",
     "@noble/hashes": "^1.5.0",
     "pngjs": "^7.0.0",
+    "pg": "^8.16.3",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
+    "@types/pg": "^8.15.5",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.5.12",
     "typescript": "^5.5.4"

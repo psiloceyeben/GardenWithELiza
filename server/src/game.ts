@@ -2,11 +2,13 @@
 import type { WebSocket } from 'ws';
 import type { GameState, Plant, Seed, Tier, ConveyorSlot } from '../../shared/types';
 import * as E from '../../shared/economy';
+import { gnomePatrol } from '../../shared/gnome-patrol';
 import { mulberry32, randomSeed, uid } from '../../shared/rng';
 import { buildVillage, lotAtPx, lotGatePx, moveActor, TILE, BIOME_NAMES, LOTS_PER_VILLAGE, type Village, type Lot } from '../../shared/world';
 import * as P from '../../shared/protocol';
 import type { ClientMsg, ServerMsg, PrivateState, PublicLot, SnapPlayer, Defenses, FeedEvent, Dir } from '../../shared/protocol';
 import { Store } from './store';
+import { MovementBudget } from './movement-budget';
 import { deriveGarden, type GardenSpec } from '../../shared/derive';
 import { readerFromEnv, type ChainReader } from '../../chain-reader/src';
 import { verifySignature, newNonce } from './sig';
@@ -31,6 +33,7 @@ export interface PlayerRec {
   speedLevel: number; rarityFloor: Tier; defenses: Defenses;
   villageId: string; lotId: number;
   createdAt: number; lastSeen: number;
+  lastSprintAt?: number;       // persisted cooldown; never supplied by a client
   stats: PrivateState['stats'];
   stolenLog: number[];
   address?: string | null;      // linked wallet (proved by signature); null/undefined = guest
@@ -38,9 +41,10 @@ export interface PlayerRec {
   visiting?: string | null;     // village id while away from home
   stolenBy?: P.Thief[];         // who robbed me in the last hour (bounty targets)
   cosmetics?: P.Cosmetics;      // Sap sinks, zero gameplay effect
-  hat?: number; hats?: number[];
+  hat?: number; hats?: number[]; skin?: number; hair?: number;
   weekly?: P.Weekly;            // trophies, reset each ISO week
   missions?: P.MissionState;    // town missions: active progress + day each was last completed
+  carried?: { plant: Plant; from: string; fromPlot: number } | null;
 }
 const dayKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
 const DEFAULT_COS: P.Cosmetics = { fence: 'wood', lantern: false, nameplate: false, path: false, gnomeHat: -1 };
@@ -51,7 +55,7 @@ const LOT_CAP = Math.min(LOTS_PER_VILLAGE, Number(process.env.PONS_LOT_CAP ?? LO
 interface Live {
   id: string; ws: WebSocket; x: number; y: number; d: Dir; f: boolean; m: boolean;
   carry: { plant: Plant; from: string; fromPlot: number } | null;
-  channel: { kind: 'uproot' | 'break'; target: string; plotId: number; startedAt: number; endsAt: number; sx: number; sy: number } | null;
+  channel: { kind: 'uproot' | 'break'; target: string; plotId: number; plantUid?: string; startedAt: number; endsAt: number; sx: number; sy: number } | null;
   shieldUntil: number; lastInputAt: number; lastChatAt: number; connectedAt: number;
   nonce: { value: string; address: string; issuedAt: string; at: number } | null;
   lastLot: number;
@@ -64,24 +68,55 @@ export class Game {
   villages = new Map<string, VillageRec>();
   maps = new Map<string, Village>();
   live = new Map<string, Live>();
+  private walletRevision = new WeakMap<Live, number>();
+  private movementBudgets = new WeakMap<Live, MovementBudget>();
   feeds = new Map<string, FeedEvent[]>();
   rng = mulberry32(randomSeed());
   nextVillage = 1;
   reader: ChainReader = readerFromEnv(process.env);
   life = new Life(this);
+  private outbox: {ws: WebSocket; data: string}[] = [];
+  private committing: Promise<void> | null = null;
 
   constructor(dataDir: string) {
     this.store = new Store(dataDir, this.players, this.villages);
-    this.store.load();
+  }
+
+  async initialize(): Promise<void> {
+    await this.store.load();
     for (const v of this.villages.values()) { this.maps.set(v.id, buildVillage(v.seed)); this.nextVillage = Math.max(this.nextVillage, v.n + 1); }
+    for (const rec of this.players.values()) if (rec.carried) {
+      const carry = rec.carried;
+      const owner = this.players.get(carry.from);
+      if (!owner) throw new Error('Carried plant has no owner');
+      this.returnPlant(owner, carry);
+      rec.carried = null;
+      this.store.ledger(rec.id, 0, 'restart-return:' + carry.plant.uid);
+    }
+    await this.store.flush();
   }
 
   // ------------------------------------------------------------ helpers
-  send(ws: WebSocket, m: ServerMsg): void { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(m)); }
+  send(ws: WebSocket, m: ServerMsg): void { if (ws.readyState === ws.OPEN) this.outbox.push({ws,data:JSON.stringify(m)}); }
+  private replaceSession(l: Live): void {
+    // Connection control is immediate, not a gameplay/persistence acknowledgement.
+    // A queued error would be discarded after this socket enters CLOSING.
+    try { if(l.ws.readyState===l.ws.OPEN)l.ws.send(JSON.stringify({t:'error',text:'signed in elsewhere',code:'session-replaced'})); } catch { /* close still carries the terminal reason */ }
+    try { l.ws.close(P.SESSION_REPLACED_CLOSE,'session replaced'); } catch { /* already closed */ }
+    this.leave(l.id,true);
+  }
+  /** Publish this batch only after its state and ledger have committed. */
+  commit(): Promise<void> {
+    if (this.committing) return this.committing;
+    const messages = this.outbox.splice(0);
+    this.committing = this.store.flush().then(() => {
+      for (const {ws,data} of messages) if (ws.readyState === ws.OPEN) ws.send(data);
+    }).catch(error => { this.outbox = messages.concat(this.outbox); throw error; }).finally(() => { this.committing = null; });
+    return this.committing;
+  }
   sendTo(id: string, m: ServerMsg): void { const l = this.live.get(id); if (l) this.send(l.ws, m); }
   broadcast(villageId: string, m: ServerMsg, except?: string): void {
-    const s = JSON.stringify(m);
-    for (const l of this.live.values()) { const r = this.players.get(l.id); if (r && l.id !== except && this.vid(r) === villageId && l.ws.readyState === l.ws.OPEN) l.ws.send(s); }
+    for (const l of this.live.values()) { const r = this.players.get(l.id); if (r && l.id !== except && this.vid(r) === villageId) this.send(l.ws, m); }
   }
   /** The village a player is currently standing in (home unless visiting). */
   vid(rec: PlayerRec): string { return rec.visiting ?? rec.villageId; }
@@ -121,8 +156,7 @@ export class Game {
     const id = this.villages.get(villageId)?.lots[lotId]; return id ? this.players.get(id) ?? null : null;
   }
   gnomePos(rec: PlayerRec, now: number): { x: number; y: number } {
-    const c = this.lot(rec).center; const a = now / 1500;
-    return { x: c.x + Math.cos(a) * 52, y: c.y + Math.sin(a) * 40 };
+    return gnomePatrol(this.lot(rec).center,now);
   }
 
   cos(rec: PlayerRec): P.Cosmetics { return rec.cosmetics ?? (rec.cosmetics = { ...DEFAULT_COS }); }
@@ -132,7 +166,7 @@ export class Game {
     return rec.weekly;
   }
   plantName(p: Plant): string { const n = SP.get(p.speciesId)!.name; return p.nick ? `${n} "${p.nick}"` : n; }
-  nameEntry(rec: PlayerRec): P.NameEntry { return { name: rec.name, color: rec.color, hat: rec.hat ?? 0 }; }
+  nameEntry(rec: PlayerRec): P.NameEntry { return { name: rec.name, color: rec.color, hat: rec.hat ?? 0, skin: rec.skin ?? 0, hair: rec.hair ?? 0 }; }
   trophies(villageId: string, now: number): P.Trophies {
     const week = weekKey(now); const recs = [...this.players.values()].filter((r) => r.villageId === villageId && r.weekly?.week === week);
     const top = (f: (w: P.Weekly) => number) => recs.filter((r) => f(r.weekly!) > 0).sort((a, b) => f(b.weekly!) - f(a.weekly!)).slice(0, 3).map((r) => ({ name: r.name, n: f(r.weekly!) }));
@@ -146,7 +180,7 @@ export class Game {
     return { address: rec.address ?? null, biome: g ? g.biome : this.homeMap(rec).biome, treeStage: g ? g.treeStage : 0, witherMarks: g ? g.witherMarks : 0, decorFlora: g ? g.decorFlora : 0, hybrids: g ? g.hybridsUnlocked : false };
   }
   privateState(rec: PlayerRec): PrivateState {
-    return { id: rec.id, name: rec.name, color: rec.color, sap: rec.sap, seeds: rec.seeds, plots: rec.plots, plotCount: rec.plotCount, conveyor: rec.conveyor, speedLevel: rec.speedLevel, rarityFloor: rec.rarityFloor, defenses: rec.defenses, lotId: rec.lotId, villageId: rec.villageId, stats: rec.stats, lockedUntil: rec.lockedUntil, land: this.landView(rec), visiting: rec.visiting ?? null, stolenBy: (rec.stolenBy ?? []).filter((t) => Date.now() - t.at < P.BOUNTY_TTL_MS), cosmetics: this.cos(rec), hat: rec.hat ?? 0, weekly: this.weekly(rec, Date.now()), missions: this.missionsOf(rec) };
+    return { id: rec.id, name: rec.name, color: rec.color, sap: rec.sap, seeds: rec.seeds, plots: rec.plots, plotCount: rec.plotCount, conveyor: rec.conveyor, speedLevel: rec.speedLevel, rarityFloor: rec.rarityFloor, defenses: rec.defenses, lotId: rec.lotId, villageId: rec.villageId, stats: rec.stats, lockedUntil: rec.lockedUntil, land: this.landView(rec), visiting: rec.visiting ?? null, stolenBy: (rec.stolenBy ?? []).filter((t) => Date.now() - t.at < P.BOUNTY_TTL_MS), cosmetics: this.cos(rec), hat: rec.hat ?? 0, hats: rec.hats ?? [0], skin: rec.skin ?? 0, hair: rec.hair ?? 0, weekly: this.weekly(rec, Date.now()), missions: this.missionsOf(rec) };
   }
 
   // ------------------------------------------------------------ town: NPCs, missions, the Oracle
@@ -195,16 +229,20 @@ export class Game {
     this.store.touch(); this.pushState(rec, { sap: rec.sap, missions: ms });
     this.send(l.ws, { t: 'npc', npc: m.npc, name: npcById(m.npc)!.name, line: '', missions: this.missionViews(rec, m.npc, now) });
   }
-  async onAsk(l: Live, rec: PlayerRec, npcId: string, text: string, now: number): Promise<void> {
-    const npc = npcById(npcId); if (!npc || !this.npcNear(rec, l, npcId)) return;
-    if (now - l.lastAskAt < 3000) return; l.lastAskAt = now;
-    const q = String(text ?? '').replace(/[<>]/g, '').trim().slice(0, 160); if (!q) return;
+  async onAsk(l: Live, rec: PlayerRec, npcId: string, text: string, now: number, requestId?: string): Promise<void> {
+    const npc = npcById(npcId); if (!npc) return;
+    const correlation = requestId === undefined ? {} : { requestId };
+    const reject = (message: string) => this.send(l.ws, { t:'say', npc:npc.id, name:npc.name, text:message, oracle:false, ...correlation });
+    if (!this.npcNear(rec, l, npcId)) return reject(UI.askTooFar);
+    if (now - l.lastAskAt < 3000) return reject(UI.askCooldown);
+    const q = String(text ?? '').replace(/[<>]/g, '').trim().slice(0, 160); if (!q) return reject(UI.askEmpty);
+    l.lastAskAt = now;
     this.progress(rec, 'ask');
     const shrug = () => npc.unsure[Math.floor(this.rng() * npc.unsure.length)];
-    const r = await Oracle.ask(Oracle.frame(npc, this.villageName(this.vid(rec)), rec.name, q));
-    if (!this.live.has(rec.id)) return;
-    if (!r) return this.send(l.ws, { t: 'say', npc: npc.id, name: npc.name, text: shrug(), oracle: false });
-    this.send(l.ws, { t: 'say', npc: npc.id, name: npc.name, text: r.withheld ? shrug() : r.text, oracle: !r.withheld });
+    const r = await Oracle.ask(Oracle.frame(npc, this.villageName(this.vid(rec)), rec.name, q), Oracle.sessionFor(l));
+    if (this.live.get(rec.id) !== l) return;
+    if (!r) return this.send(l.ws, { t: 'say', npc: npc.id, name: npc.name, text: shrug(), oracle: false, ...correlation });
+    this.send(l.ws, { t: 'say', npc: npc.id, name: npc.name, text: r.withheld ? shrug() : r.text, oracle: !r.withheld, ...correlation });
   }
   /** Defenses as others may see them: a scarecrow reads as a gnome; the bell stays private. */
   publicDefenses(d: Defenses): Defenses { return { gateMax: d.gateMax, gateHp: d.gateHp, gnome: d.gnome || !!d.scarecrow, sprinkler: d.sprinkler, mud: !!d.mud }; }
@@ -225,36 +263,43 @@ export class Game {
       const r = this.players.get(l.id)!; if (this.vid(r) !== villageId) continue;
       const s: SnapPlayer = { id: l.id, x: Math.round(l.x), y: Math.round(l.y), d: l.d, f: l.f, m: l.m, c: l.carry ? l.carry.plant.speciesId : '', ch: l.channel ? Math.min(1, (now - l.channel.startedAt) / (l.channel.endsAt - l.channel.startedAt)) : 0 };
       if (this.bountyOn(r, now)) s.b = true;
+      if (l.carry) s.cp = { mutation:l.carry.plant.mutation, size:l.carry.plant.size };
       out.push(s);
     }
     return out;
   }
   bountyOn(thief: PlayerRec, now: number): P.Bounty | null {
     const v = this.villages.get(thief.villageId); if (!v?.bounties) return null;
+    const before = v.bounties.length;
     v.bounties = v.bounties.filter((b) => b.until > now);
+    if (v.bounties.length !== before) this.store.touch();
     return v.bounties.find((b) => b.thiefId === thief.id) ?? null;
   }
   bountiesIn(villageId: string, now: number): P.Bounty[] { const v = this.villages.get(villageId); return (v?.bounties ?? []).filter((b) => b.until > now); }
-  addSap(rec: PlayerRec, delta: number, reason: string): void { rec.sap += delta; if (reason !== 'tick') this.store.ledger(rec.id, delta, reason); this.store.touch(); }
+  addSap(rec: PlayerRec, delta: number, reason: string): void { rec.sap += delta; this.store.ledger(rec.id, delta, reason); this.store.touch(); }
 
   // ------------------------------------------------------------ join / leave
   join(ws: WebSocket, m: Extract<ClientMsg, { t: 'hello' }>): Live | null {
+    if (!isClientMsg(m) || m.t !== 'hello') return null;
     const now = Date.now();
     const id = String(m.id).replace(/[^a-z0-9]/gi, '').slice(0, 32); const secret = String(m.secret).slice(0, 64);
     if (id.length < 8 || secret.length < 8) { this.send(ws, { t: 'error', text: 'bad identity' }); return null; }
     let rec = this.players.get(id);
-    if (rec && rec.secret !== secret) { this.send(ws, { t: 'error', text: 'identity mismatch' }); return null; }
+    if (rec && rec.secret !== secret) {
+      try { ws.close(P.IDENTITY_REJECTED_CLOSE,'sign-in rejected'); } catch { /* already closed */ }
+      return null;
+    }
     if (!rec) {
       rec = this.newPlayer(id, secret, m.name, m.save ?? null, now);
       this.feed(rec.villageId, 'join', `${rec.name} moved into lot ${rec.lotId + 1}`);
     } else if (this.live.has(id)) {
-      const old = this.live.get(id)!; this.send(old.ws, { t: 'error', text: 'signed in elsewhere' }); old.ws.close(); this.leave(id, true);
+      this.replaceSession(this.live.get(id)!);
     }
     // offline accrual (cap 8 h)
     const elapsed = Math.min(Math.max(0, now - rec.lastSeen), E.OFFLINE_CAP_MS);
     let off = 0; for (const p of rec.plots) if (p) off += E.sapPerSec(p, SP.get(p.speciesId)!) * (elapsed / 1000);
     if (off >= 1) { this.addSap(rec, Math.floor(off), 'offline'); }
-    rec.lastSeen = now;
+    rec.lastSeen = now; this.store.touch();
     if (rec.visiting && !this.villages.has(rec.visiting)) rec.visiting = null;
     if (rec.plotCount < DEFAULT_PLOTS) { while (rec.plots.length < DEFAULT_PLOTS) { rec.plots.push(null); rec.lockedUntil.push(0); } rec.plotCount = DEFAULT_PLOTS; this.store.touch(); }
     const spawn = this.spawnFor(rec);
@@ -299,6 +344,7 @@ export class Game {
 
   // ------------------------------------------------------------ phase three: cosmetics, wardrobe, nicknames (pure Sap sinks)
   onCosmetic(l: Live, rec: PlayerRec, item: P.CosmeticItem): void {
+    if (!Object.prototype.hasOwnProperty.call(P.COSMETIC_PRICES, item)) return;
     const price = P.COSMETIC_PRICES[item]; if (price === undefined) return;
     const c = this.cos(rec);
     const owned = item === 'fence_wood' ? c.fence === 'wood' : item === 'fence_stone' ? c.fence === 'stone' : item === 'fence_hedge' ? c.fence === 'hedge' : item === 'lantern' ? c.lantern : item === 'nameplate' ? c.nameplate : item === 'path' ? c.path : c.gnomeHat === Number(item.slice(4));
@@ -311,19 +357,28 @@ export class Game {
     this.store.touch(); this.pushState(rec, { sap: rec.sap, cosmetics: c }); this.pushLot(rec);
   }
 
-  onWardrobe(l: Live, rec: PlayerRec, shirt?: number, hat?: number): void {
-    let changed = false;
-    if (Number.isInteger(shirt) && shirt! >= 0 && shirt! < 6 && shirt !== rec.color) {
-      if (rec.sap < P.SHIRT_PRICE) return this.send(l.ws, { t: 'toast', text: copyJson.ui.cantAfford });
-      this.addSap(rec, -P.SHIRT_PRICE, 'shirt'); rec.color = shirt!; changed = true;
+  onWardrobe(l: Live, rec: PlayerRec, shirt?: number, hat?: number, skin?: number, hair?: number): void {
+    if (hair !== undefined && (!Number.isInteger(hair) || hair < 0 || hair >= P.HAIR_STYLES.length)) return;
+    if (skin !== undefined && (!Number.isInteger(skin) || skin < 0 || skin >= P.SKIN_TONES.length)) return;
+    if (shirt !== undefined && (!Number.isInteger(shirt) || shirt < 0 || shirt >= 6)) return;
+    if (hat !== undefined && (!Number.isInteger(hat) || hat < 0 || hat >= P.HAT_COUNT)) return;
+    const changeShirt = shirt !== undefined && shirt !== rec.color;
+    const changeHat = hat !== undefined && hat !== (rec.hat ?? 0);
+    const changeSkin = skin !== undefined && skin !== (rec.skin ?? 0);
+    const changeHair = hair !== undefined && hair !== (rec.hair ?? 0);
+    if (!changeShirt && !changeHat && !changeSkin && !changeHair) return;
+    const owned = rec.hats ?? [0];
+    const hatPrice = changeHat && !owned.includes(hat!) ? P.HAT_PRICES[hat!] : 0;
+    // Validate the entire request before mutating either selection or balance.
+    if (rec.sap < (changeShirt ? P.SHIRT_PRICE : 0) + hatPrice) return this.send(l.ws, { t: 'toast', text: copyJson.ui.cantAfford });
+    if (changeShirt) { this.addSap(rec, -P.SHIRT_PRICE, 'shirt'); rec.color = shirt!; }
+    if (changeHat) {
+      if (hatPrice) this.addSap(rec, -hatPrice, `hat:${hat}`);
+      rec.hats = owned.includes(hat!) ? owned : [...owned, hat!]; rec.hat = hat!;
     }
-    if (Number.isInteger(hat) && hat! >= 0 && hat! < P.HAT_COUNT && hat !== (rec.hat ?? 0)) {
-      rec.hats = rec.hats ?? [0];
-      if (!rec.hats.includes(hat!)) { const price = P.HAT_PRICES[hat!]; if (rec.sap < price) return this.send(l.ws, { t: 'toast', text: copyJson.ui.cantAfford }); this.addSap(rec, -price, `hat:${hat}`); rec.hats.push(hat!); }
-      rec.hat = hat!; changed = true;
-    }
-    if (!changed) return;
-    this.store.touch(); this.pushState(rec, { sap: rec.sap, color: rec.color, hat: rec.hat ?? 0 });
+    if (changeSkin) rec.skin = skin;
+    if (changeHair) rec.hair = hair;
+    this.store.touch(); this.pushState(rec, { sap: rec.sap, color: rec.color, hat: rec.hat ?? 0, hats: rec.hats ?? [0], skin: rec.skin ?? 0, hair: rec.hair ?? 0 });
     this.broadcast(this.vid(rec), { t: 'players', names: { [rec.id]: this.nameEntry(rec) } }); this.pushLot(rec);
   }
 
@@ -338,8 +393,8 @@ export class Game {
     if (!thief || thief.id === rec.id || !Number.isFinite(a) || a < P.BOUNTY_MIN_POST || a > P.BOUNTY_MAX_POST) return;
     if (!(rec.stolenBy ?? []).some((t) => t.id === thiefId && now - t.at < P.BOUNTY_TTL_MS)) return;
     if (rec.sap < a) return this.send(l.ws, { t: 'toast', text: copyJson.ui.cantAfford });
-    const v = this.villages.get(thief.villageId)!; v.bounties = (v.bounties ?? []).filter((b) => b.until > now && b.thiefId !== thiefId);
     const prev = this.bountyOn(thief, now); const total = a + (prev?.amount ?? 0);
+    const v = this.villages.get(thief.villageId)!; v.bounties = (v.bounties ?? []).filter((b) => b.until > now && b.thiefId !== thiefId);
     v.bounties.push({ thiefId, thiefName: thief.name, byName: rec.name, amount: total, until: now + P.BOUNTY_TTL_MS });
     this.addSap(rec, -a, `bounty:${thiefId}`); this.pushState(rec, { sap: rec.sap });
     this.send(l.ws, { t: 'toast', text: `${UI.bountyPosted} ${thief.name}: ${total} ${copyJson.ui.sap}` });
@@ -358,21 +413,15 @@ export class Game {
     const rec: PlayerRec = {
       id, secret, name: cleanName(name) || `Gardener ${Math.floor(Math.random() * 900 + 100)}`, color: Math.floor(Math.random() * 6),
       sap: E.STARTING_SAP, seeds: [], plots: Array(plotCount).fill(null), plotCount, lockedUntil: Array(plotCount).fill(0),
-      conveyor: { slots: E.rollConveyor(this.rng, ROSTER, 'common', plotCount), refreshAt: now + E.CONVEYOR_REFRESH_MS },
+      conveyor: { slots: E.rollStarterConveyor(this.rng, ROSTER, plotCount), refreshAt: now + E.CONVEYOR_REFRESH_MS },
       speedLevel: 0, rarityFloor: 'common', defenses: { gateMax: 0, gateHp: 0, gnome: false, sprinkler: false, scarecrow: false, mud: false, bell: false },
       villageId: village.id, lotId, createdAt: now, lastSeen: now,
       stats: { seedsBought: 0, reveals: 0, steals: 0, tags: 0, stolenFrom: 0 }, stolenLog: [],
       address: null, garden: null, visiting: null, stolenBy: [],
     };
-    // migrate the M1 local save once
-    if (save && typeof save.sap === 'number') {
-      rec.sap = Math.min(Math.max(0, Math.floor(save.sap)), 50000);
-      rec.seeds = (save.seeds ?? []).slice(0, 40);
-      (save.plots ?? []).slice(0, plotCount).forEach((p, i) => { if (p?.plant) rec.plots[i] = p.plant; });
-      rec.speedLevel = Math.min(E.SPEED_MAX_LEVEL, save.speedLevel ?? 0);
-      rec.stats.seedsBought = save.stats?.seedsBought ?? 0; rec.stats.reveals = save.stats?.reveals ?? 0;
-    }
-    village.lots[lotId] = id; this.players.set(id, rec); this.store.touch();
+    // Browser saves are unauthenticated input, never authority for multiplayer
+    // balances/items. A future migration must use an owner-reviewed server import.
+    village.lots[lotId] = id; this.players.set(id, rec); this.store.ledger(id, rec.sap, 'initial-balance'); this.store.touch();
     return rec;
   }
 
@@ -388,9 +437,11 @@ export class Game {
 
   // ------------------------------------------------------------ messages
   handle(l: Live, m: ClientMsg): void | Promise<void> {
+    if (!isClientMsg(m)) return;
+    if (this.live.get(l.id) !== l) return;
     const rec = this.players.get(l.id)!; const now = Date.now();
     switch (m.t) {
-      case 'forage': return this.life.forage(l, rec, String(m.id));
+      case 'forage': return this.life.forage(l, rec, String(m.id),now);
       case 'sprint': return this.life.sprintStart(l, rec, now);
       case 'bounty': return this.onBounty(l, rec, String(m.thiefId), m.amount, now);
       case 'visit': return this.onVisit(l, rec, String(m.village), now);
@@ -398,7 +449,7 @@ export class Game {
       case 'villages': return this.send(l.ws, { t: 'villages', list: this.villageList() });
       case 'nonce': return this.onNonce(l, m.address, now);
       case 'link': return this.onLink(l, rec, m.address, m.signature, now);
-      case 'unlink': rec.address = null; rec.garden = null; rec.rarityFloor = 'common'; this.store.touch(); this.pushState(rec, { rarityFloor: 'common', land: this.landView(rec) }); this.send(l.ws, { t: 'linked', address: null, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor }); this.pushLot(rec); return;
+      case 'unlink': this.walletRevision.set(l, (this.walletRevision.get(l) ?? 0) + 1); l.nonce = null; rec.address = null; rec.garden = null; rec.rarityFloor = 'common'; this.store.touch(); this.pushState(rec, { rarityFloor: 'common', land: this.landView(rec) }); this.send(l.ws, { t: 'linked', address: null, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor }); this.pushLot(rec); return;
       case 'input': return this.onInput(l, rec, m, now);
       case 'buy': return this.onBuy(l, rec, m.slot);
       case 'plant': return this.onPlant(l, rec, m.seedUid, m.plotId, now);
@@ -411,43 +462,57 @@ export class Game {
       case 'emote': if (Number.isInteger(m.e) && m.e >= 0 && m.e < P.EMOTES.length) this.broadcast(this.vid(rec), { t: 'emote', id: l.id, e: m.e }); return;
       case 'rename': { const n = cleanName(m.name); if (n) { rec.name = n; this.store.touch(); this.pushState(rec, { name: n }); this.broadcast(this.vid(rec), { t: 'players', names: { [rec.id]: this.nameEntry(rec) } }); this.pushLot(rec); } return; }
       case 'cosmetic': return this.onCosmetic(l, rec, m.item);
-      case 'wardrobe': return this.onWardrobe(l, rec, m.shirt, m.hat);
+      case 'wardrobe': return this.onWardrobe(l, rec, m.shirt, m.hat, m.skin, m.hair);
       case 'nick': return this.onNick(rec, m.plotId, m.name);
       case 'talk': return this.onTalk(l, rec, String(m.npc), now);
       case 'mission': return this.onMission(l, rec, String(m.id), m.action === 'claim' ? 'claim' : 'accept', now);
-      case 'ask': return this.onAsk(l, rec, String(m.npc), String(m.text), now);
+      case 'ask': return this.onAsk(l, rec, String(m.npc), String(m.text), now, m.requestId);
       case 'ping': this.send(l.ws, { t: 'pong', n: m.n, now }); return;
     }
   }
 
   // ------------------------------------------------------------ wallet link (read-only; a free signature proves control — I-1/I-2)
   onNonce(l: Live, address: string, now: number): void {
+    if (this.live.get(l.id) !== l) return;
     const a = String(address).toLowerCase(); if (!/^0x[0-9a-f]{40}$/.test(a)) return;
+    this.walletRevision.set(l, (this.walletRevision.get(l) ?? 0) + 1);
     l.nonce = { value: newNonce(), address: a, issuedAt: new Date(now).toISOString(), at: now };
     this.send(l.ws, { t: 'nonce', address: a, message: signMessage(a, l.nonce.value, l.nonce.issuedAt) });
   }
 
   async onLink(l: Live, rec: PlayerRec, address: string, signature: string, now: number): Promise<void> {
+    if (this.live.get(rec.id) !== l) return;
+    const revision = this.walletRevision.get(l) ?? 0;
     const a = String(address).toLowerCase(); const n = l.nonce; l.nonce = null;
     if (!n || n.address !== a || now - n.at > 10 * 60_000) return this.send(l.ws, { t: 'toast', text: UI.linkFail });
     if (!verifySignature(signMessage(a, n.value, n.issuedAt), String(signature), a)) return this.send(l.ws, { t: 'toast', text: UI.linkFail });
+    if (this.adoptWallet(l, rec, a)) return;
+    let spec: GardenSpec;
+    try { spec = deriveGarden(a, await this.reader.snapshot(a)); } catch (e) {
+      if (this.live.get(rec.id) === l && this.walletRevision.get(l) === revision) this.send(l.ws, { t: 'toast', text: UI.linkFail });
+      return;
+    }
+    if (this.live.get(rec.id) !== l || this.walletRevision.get(l) !== revision) return;
+    // Another signed-in device may have claimed this wallet while the read awaited.
+    if (this.adoptWallet(l, rec, a)) return;
+    this.applyGarden(rec, spec, Date.now());
+    this.send(l.ws, { t: 'linked', address: a, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor });
+    this.send(l.ws, { t: 'toast', text: UI.linkOk });
+    this.feed(rec.villageId, 'join', `${rec.name} claimed their land (${rec.plotCount} plots)`);
+  }
+
+  private adoptWallet(l: Live, rec: PlayerRec, a: string): boolean {
     const other = [...this.players.values()].find((r) => r.address === a && r.id !== rec.id);
     if (other) {
       // Wallet sign-in: the wallet already owns a garden, so this device becomes that player.
       // A fresh device secret is issued for it; the guest record this socket started as is left untouched.
-      if (this.live.has(other.id)) { const o = this.live.get(other.id)!; this.send(o.ws, { t: 'error', text: 'signed in elsewhere' }); o.ws.close(); this.leave(other.id, true); }
+      if (this.live.has(other.id)) this.replaceSession(this.live.get(other.id)!);
       other.secret = newNonce() + newNonce(); this.store.touch();
       this.send(l.ws, { t: 'identity', id: other.id, secret: other.secret, name: other.name });
       this.send(l.ws, { t: 'toast', text: UI.adopted });
-      return;
+      return true;
     }
-    let spec: GardenSpec;
-    try { spec = deriveGarden(a, await this.reader.snapshot(a)); } catch (e) { console.error('derive', e); return this.send(l.ws, { t: 'toast', text: UI.linkFail }); }
-    if (!this.live.has(rec.id)) return;
-    this.applyGarden(rec, spec, now);
-    this.send(l.ws, { t: 'linked', address: a, land: this.landView(rec), plotCount: rec.plotCount, rarityFloor: rec.rarityFloor });
-    this.send(l.ws, { t: 'toast', text: UI.linkOk });
-    this.feed(rec.villageId, 'join', `${rec.name} claimed their land (${rec.plotCount} plots)`);
+    return false;
   }
 
   applyGarden(rec: PlayerRec, spec: GardenSpec, now: number): void {
@@ -462,22 +527,25 @@ export class Game {
   }
 
   onInput(l: Live, rec: PlayerRec, m: Extract<ClientMsg, { t: 'input' }>, now: number): void {
-    const dt = Math.min(0.5, (now - l.lastInputAt) / 1000); l.lastInputAt = now;
-    const max = this.speedOf(l, rec, now) * dt * 1.35 + 6;
     const x = Number(m.x); const y = Number(m.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    let budget = this.movementBudgets.get(l);
+    if (!budget) { budget = new MovementBudget(l.lastInputAt); this.movementBudgets.set(l, budget); }
+    l.lastInputAt = Math.max(l.lastInputAt, now);
     const dist = Math.hypot(x - l.x, y - l.y);
-    if (dist <= max) {
+    if (budget.take(dist, this.speedOf(l, rec, now), now)) {
       // accept the client's predicted position only if the path is walkable (collision re-check)
       const gc = this.gateClosedFn(this.vid(rec));
       const r = moveActor(this.map(rec), l.x, l.y, x - l.x, y - l.y, gc);
       l.x = r.x; l.y = r.y;
     }
+    if (Math.hypot(l.x - x, l.y - y) > 0.01) this.send(l.ws, { t: 'correction', x: l.x, y: l.y });
     l.d = (['down', 'up', 'side'] as Dir[]).includes(m.d) ? m.d : 'down'; l.f = !!m.f; l.m = !!m.m || dist > 0.5;
     if (l.channel && Math.hypot(l.x - l.channel.sx, l.y - l.channel.sy) > 6) this.cancelChannel(l, copyJson.ui.channelMoved);
   }
 
   onBuy(l: Live, rec: PlayerRec, i: number): void {
+    if (!Number.isInteger(i) || i < 0 || i >= rec.conveyor.slots.length) return;
     const slot = rec.conveyor.slots[i]; if (!slot || slot.sold) return;
     if (rec.sap < slot.price) return this.send(l.ws, { t: 'toast', text: copyJson.ui.cantAfford });
     this.addSap(rec, -slot.price, `buy:${slot.speciesId}`); slot.sold = true;
@@ -485,7 +553,14 @@ export class Game {
     this.pushState(rec, { sap: rec.sap, seeds: rec.seeds, conveyor: rec.conveyor, stats: rec.stats }); this.progress(rec, 'buy');
   }
 
+  private canReachOwnPlot(l: Live, rec: PlayerRec, plotId: number): boolean {
+    if (!Number.isInteger(plotId) || plotId < 0 || plotId >= rec.plotCount || this.vid(rec) !== rec.villageId) return false;
+    const p = this.lot(rec).plots[plotId];
+    return !!p && Math.hypot(p.tx * TILE + 16 - l.x, p.ty * TILE + 16 - l.y) <= 40;
+  }
+
   onPlant(l: Live, rec: PlayerRec, seedUid: string, plotId: number, now: number): void {
+    if (!this.canReachOwnPlot(l, rec, plotId)) return;
     const idx = rec.seeds.findIndex((s) => s.uid === seedUid);
     if (idx < 0 || !Number.isInteger(plotId) || plotId < 0 || plotId >= rec.plotCount || rec.plots[plotId]) return;
     const seed = rec.seeds.splice(idx, 1)[0];
@@ -494,6 +569,7 @@ export class Game {
   }
 
   onTend(l: Live, rec: PlayerRec, plotId: number, now: number): void {
+    if (!this.canReachOwnPlot(l, rec, plotId)) return;
     const p = rec.plots[plotId]; if (!p) return;
     if (!p.revealed) {
       if (p.watered) return this.send(l.ws, { t: 'toast', text: `${copyJson.ui.growing}: ${fmt(p.plantedAt + p.growMs - now)}` });
@@ -539,7 +615,7 @@ export class Game {
     if (p.tier === 'mythic') { const ol = this.live.get(owner.id); const oin = ol && !owner.visiting ? lotAtPx(this.homeMap(owner), ol.x, ol.y) : null; if (!oin || oin.id !== owner.lotId) return deny(copyJson.ui.raidMythic); }
     if (!rec.plots.some((x) => !x)) return deny(copyJson.ui.noFreePlot);
     const pp = this.map(rec).lots[owner.lotId].plots[plotId]; if (Math.hypot(pp.tx * TILE + 16 - l.x, pp.ty * TILE + 16 - l.y) > 40) return deny(copyJson.ui.raidTooFar);
-    l.channel = { kind: 'uproot', target: owner.id, plotId, startedAt: now, endsAt: now + P.UPROOT_MS, sx: l.x, sy: l.y };
+    l.channel = { kind: 'uproot', target: owner.id, plotId, plantUid: p.uid, startedAt: now, endsAt: now + P.UPROOT_MS, sx: l.x, sy: l.y };
     this.send(l.ws, { t: 'channel', kind: 'uproot', endsAt: l.channel.endsAt, startedAt: now });
     this.sendTo(owner.id, { t: 'toast', text: `${rec.name} ${copyJson.ui.raidWarning} ${SP.get(p.speciesId)!.name}!` });
   }
@@ -562,29 +638,49 @@ export class Game {
   }
 
   completeChannel(l: Live, rec: PlayerRec, now: number): void {
+    if (!l.channel || now < l.channel.endsAt) return;
     const ch = l.channel!; l.channel = null; this.send(l.ws, { t: 'channel', kind: null, endsAt: 0, startedAt: 0 });
     const owner = this.players.get(ch.target); if (!owner) return;
+    if (this.live.get(rec.id) !== l || owner.villageId !== this.vid(rec) || this.isShielded(owner, now) ||
+        l.carry || Math.hypot(l.x - ch.sx, l.y - ch.sy) > 6) return;
     if (ch.kind === 'break') {
+      const gate = lotGatePx(this.lot(owner));
+      if (Math.hypot(gate.x - l.x, gate.y - l.y) > 48) return;
       owner.defenses.gateHp = Math.max(0, owner.defenses.gateHp - 1); this.store.touch(); this.pushLot(owner); this.pushState(owner, { defenses: owner.defenses });
       if (owner.defenses.gateHp === 0) this.feed(owner.villageId, 'gate', `${rec.name} broke ${owner.name}'s gate open`);
       return;
     }
-    const p = owner.plots[ch.plotId]; if (!p || this.isShielded(owner, now)) return;
+    const p = owner.plots[ch.plotId];
+    if (!p || p.uid !== ch.plantUid || !p.revealed || (owner.lockedUntil[ch.plotId] ?? 0) > now || !rec.plots.some(x => !x)) return;
+    if (owner.stolenLog.filter(t => t > now - 3600_000).length >= P.STEAL_CAP_PER_HOUR) return;
+    const inLot = lotAtPx(this.map(rec), l.x, l.y); if (!inLot || inLot.id !== owner.lotId) return;
+    const pp = this.lot(owner).plots[ch.plotId];
+    if (!pp || Math.hypot(pp.tx * TILE + 16 - l.x, pp.ty * TILE + 16 - l.y) > 40) return;
+    if (p.tier === 'mythic') {
+      const ol = this.live.get(owner.id); const home = ol && !owner.visiting ? lotAtPx(this.homeMap(owner), ol.x, ol.y) : null;
+      if (!home || home.id !== owner.lotId) return;
+    }
     owner.plots[ch.plotId] = null; l.carry = { plant: p, from: owner.id, fromPlot: ch.plotId };
+    rec.carried = l.carry;
     this.store.touch(); this.pushLot(owner); this.pushState(owner, { plots: owner.plots });
-    this.send(l.ws, { t: 'carry', speciesId: p.speciesId });
+    this.send(l.ws, { t: 'carry', speciesId: p.speciesId, appearance:{mutation:p.mutation,size:p.size} });
     this.feed(owner.villageId, 'uproot', `${rec.name} uprooted ${owner.name}'s ${this.plantName(p)}!`);
   }
 
   /** Plant returns to its owner. tagger = who tagged (bounty) or null (disconnect). */
+  private returnPlant(owner: PlayerRec, c: NonNullable<PlayerRec['carried']>): void {
+    if (owner.plots.some(p => p?.uid === c.plant.uid)) return;
+    if (!owner.plots[c.fromPlot]) owner.plots[c.fromPlot] = c.plant;
+    else { const free = owner.plots.findIndex(x => !x); if (free >= 0) owner.plots[free] = c.plant; else owner.seeds.push({uid:uid('s'),speciesId:c.plant.speciesId,tier:c.plant.tier}); }
+  }
   recover(l: Live, thief: PlayerRec, tagger: PlayerRec | null, now: number, bounty: boolean): void {
     const c = l.carry; if (!c) return; l.carry = null;
+    thief.carried = null; this.store.touch();
     const owner = this.players.get(c.from);
     this.send(l.ws, { t: 'carry', speciesId: null });
     if (!owner) return;
     const sp = SP.get(c.plant.speciesId)!;
-    if (!owner.plots[c.fromPlot]) owner.plots[c.fromPlot] = c.plant;
-    else { const free = owner.plots.findIndex((x) => !x); if (free >= 0) owner.plots[free] = c.plant; else owner.seeds.push({ uid: uid('s'), speciesId: c.plant.speciesId, tier: c.plant.tier }); }
+    this.returnPlant(owner, c);
     if (bounty && tagger) {
       const b = Math.max(P.BOUNTY_MIN, Math.floor(E.sapPerSec(c.plant, sp) * P.BOUNTY_SEC)); this.addSap(tagger, b, 'bounty'); tagger.stats.tags += 1; this.weekly(tagger, now).tags += 1;
       this.feed(this.vid(thief), 'tag', `${tagger.name} tagged ${thief.name} and got the ${this.plantName(c.plant)} back (+${b} Sap)`);
@@ -603,6 +699,7 @@ export class Game {
     const c = l.carry!; const free = thief.plots.findIndex((x) => !x);
     if (free < 0) return; // keep carrying until a plot frees up
     l.carry = null; this.send(l.ws, { t: 'carry', speciesId: null });
+    thief.carried = null;
     const sp = SP.get(c.plant.speciesId)!; c.plant.lastWeeded = now; thief.plots[free] = c.plant; thief.stats.steals += 1;
     const wk = this.weekly(thief, now); wk.steals += 1; if (E.tierIndex(c.plant.tier) > wk.heistTier) { wk.heistTier = E.tierIndex(c.plant.tier); wk.heistSpecies = c.plant.speciesId; }
     const owner = this.players.get(c.from);
@@ -636,14 +733,18 @@ export class Game {
       }
       if (l.channel) {
         const owner = this.players.get(l.channel.target); const ol = owner ? this.live.get(owner.id) : null;
-        if (ol && Math.hypot(ol.x - l.x, ol.y - l.y) < P.TAG_RADIUS) { this.cancelChannel(l, copyJson.ui.raidInterrupted); this.sendTo(owner!.id, { t: 'toast', text: `${copyJson.ui.raidYouInterrupted} ${rec.name}` }); continue; }
-        if (owner && owner.defenses.gnome && l.channel.kind === 'uproot') { const g = this.gnomePos(owner, now); if (Math.hypot(g.x - l.x, g.y - l.y) < P.GNOME_RADIUS) { this.cancelChannel(l, copyJson.ui.raidGnome); continue; } }
+        if (ol && owner && this.vid(owner) === this.vid(rec) && Math.hypot(ol.x - l.x, ol.y - l.y) < P.TAG_RADIUS) { this.cancelChannel(l, copyJson.ui.raidInterrupted); this.sendTo(owner.id, { t: 'toast', text: `${copyJson.ui.raidYouInterrupted} ${rec.name}` }); continue; }
+        if (owner && owner.villageId === this.vid(rec) && owner.defenses.gnome && l.channel.kind === 'uproot') { const g = this.gnomePos(owner, now); if (Math.hypot(g.x - l.x, g.y - l.y) < P.GNOME_RADIUS) { this.cancelChannel(l, copyJson.ui.raidGnome); continue; } }
         if (now >= l.channel.endsAt) this.completeChannel(l, rec, now);
       }
       if (l.carry) {
         const owner = this.players.get(l.carry.from); const ol = owner ? this.live.get(owner.id) : null;
-        if (owner && ol && Math.hypot(ol.x - l.x, ol.y - l.y) < P.TAG_RADIUS) { this.recover(l, rec, owner, now, true); continue; }
-        if (owner && owner.defenses.gnome) { const inLot = lotAtPx(this.map(rec), l.x, l.y); if (inLot && inLot.id === owner.lotId) { const g = this.gnomePos(owner, now); if (Math.hypot(g.x - l.x, g.y - l.y) < P.GNOME_RADIUS) { this.recover(l, rec, owner, now, true); continue; } } }
+        if (owner && ol && this.vid(owner) === this.vid(rec) && Math.hypot(ol.x - l.x, ol.y - l.y) < P.TAG_RADIUS) { this.recover(l, rec, owner, now, true); continue; }
+        if (owner && owner.villageId === this.vid(rec) && owner.defenses.gnome) { const inLot = lotAtPx(this.map(rec), l.x, l.y); if (inLot && inLot.id === owner.lotId) { const g = this.gnomePos(owner, now); if (Math.hypot(g.x - l.x, g.y - l.y) < P.GNOME_RADIUS) { this.recover(l, rec, owner, now, true); continue; } } }
+        if (this.bountyOn(rec, now)) {
+          const hunter = [...this.live.values()].find(h => h.id !== rec.id && this.vid(this.players.get(h.id)!) === this.vid(rec) && Math.hypot(h.x - l.x, h.y - l.y) < P.TAG_RADIUS);
+          if (hunter) { this.recover(l, rec, this.players.get(hunter.id)!, now, true); continue; }
+        }
         const mine = lotAtPx(this.map(rec), l.x, l.y); if (!rec.visiting && mine && mine.id === rec.lotId) this.score(l, rec, now);
       }
     }
@@ -669,6 +770,8 @@ export class Game {
         if (p.revealed) sps += E.sapPerSec(p, SP.get(p.speciesId)!);
       }
       if (sps > 0) this.addSap(rec, sps, 'tick');
+      // The paid-through time must commit with Sap, or a crash can pay it twice.
+      rec.lastSeen = now; this.store.touch();
       if (now >= rec.conveyor.refreshAt) { rec.conveyor = { slots: E.rollConveyor(this.rng, ROSTER, rec.rarityFloor, rec.plotCount, rec.garden?.hybridsUnlocked ?? false), refreshAt: now + E.CONVEYOR_REFRESH_MS }; changed = true; this.send(l.ws, { t: 'toast', text: `${copyJson.ui.conveyor}: ${copyJson.ui.newSeeds}` }); }
       this.pushState(rec, changed ? { sap: rec.sap, plots: rec.plots, conveyor: rec.conveyor, stats: rec.stats } : { sap: rec.sap });
       if (changed) this.pushLot(rec);
@@ -680,3 +783,4 @@ export class Game {
 
 function cleanName(n: unknown): string { return String(n ?? '').replace(/[^\w \-'.]/g, '').trim().slice(0, 16); }
 function fmt(ms: number): string { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`; }
+import { isClientMsg } from './validate-message';

@@ -16,14 +16,13 @@ const EVENT_ORDER: EventKind[] = ['seed_rain', 'screaming_hour', 'golden_hour'];
 const SPAWN_MS = Number(process.env.PONS_WILD_SPAWN_MS ?? P.WILD_SPAWN_MS);
 const EVENT_COPY: Record<EventKind, string> = { seed_rain: UI.evSeedRain, screaming_hour: UI.evScreaming, golden_hour: UI.evGolden };
 
-interface Sprint { startedAt: number; turned: boolean; }
+interface Sprint { startedAt: number; turned: boolean; villageId:string; socket:import('ws').WebSocket; }
 
 export class Life {
   wild = new Map<string, Wild[]>();
   events = new Map<string, VillageEvent | null>();
   sprints = new Map<string, Sprint>();
   lastSpawn = new Map<string, number>();
-  lastSprint = new Map<string, number>();
   private period = -1;
 
   constructor(private game: Game) {}
@@ -94,11 +93,14 @@ export class Life {
     for (const [id, s] of this.sprints) {
       const l = this.game.live.get(id); const rec = l && this.game.players.get(id);
       if (!l || !rec) { this.sprints.delete(id); continue; }
+      if(s.socket!==l.ws || s.villageId!==this.game.vid(rec)){
+        this.sprints.delete(id);this.game.send(l.ws,{t:'sprint',phase:'cancel'});continue;
+      }
       const v = this.game.map(rec); const tr = this.track(v); const fo = this.fountain(v);
       if (now - s.startedAt > 30_000 || l.carry) { this.sprints.delete(id); this.game.send(l.ws, { t: 'sprint', phase: 'cancel' }); continue; }
       if (!s.turned) { if (Math.hypot(l.x - fo.x, l.y - fo.y) < 60) { s.turned = true; this.game.send(l.ws, { t: 'sprint', phase: 'turn' }); } continue; }
       if (Math.hypot(l.x - tr.x, l.y - tr.y) < 40) {
-        const ms = now - s.startedAt; this.sprints.delete(id); this.lastSprint.set(id, now);
+        const ms = now - s.startedAt; this.sprints.delete(id); rec.lastSprintAt=now;
         const vrec = this.game.villages.get(this.game.vid(rec))!; const board = (vrec.sprint ?? []).slice();
         const record = !board.length || ms < board[0].ms;
         board.push({ name: rec.name, ms, at: now }); board.sort((a, b) => a.ms - b.ms); vrec.sprint = board.slice(0, 5); this.game.store.touch();
@@ -112,9 +114,9 @@ export class Life {
   }
 
   // ------------------------------------------------------------ intents
-  forage(l: { x: number; y: number; ws: import('ws').WebSocket }, rec: PlayerRec, id: string): void {
+  forage(l: { x: number; y: number; ws: import('ws').WebSocket }, rec: PlayerRec, id: string, now=Date.now()): void {
     const list = this.wild.get(this.game.vid(rec)) ?? []; const w = list.find((x) => x.id === id);
-    if (!w) return this.game.send(l.ws, { t: 'toast', text: UI.wildGone });
+    if (!w || now >= w.until) return this.game.send(l.ws, { t: 'toast', text: UI.wildGone });
     if (Math.hypot(w.x - l.x, w.y - l.y) > 44) return this.game.send(l.ws, { t: 'toast', text: UI.raidTooFar });
     if (rec.seeds.length >= 40) return;
     this.wild.set(this.game.vid(rec), list.filter((x) => x.id !== id)); this.game.broadcast(this.game.vid(rec), { t: 'wild', remove: [id] });
@@ -124,9 +126,10 @@ export class Life {
 
   sprintStart(l: { x: number; y: number; ws: import('ws').WebSocket; carry: unknown }, rec: PlayerRec, now: number): void {
     if (this.sprints.has(rec.id) || l.carry) return;
-    if (now - (this.lastSprint.get(rec.id) ?? 0) < P.SPRINT_COOLDOWN_MS) return this.game.send(l.ws, { t: 'toast', text: UI.sprintCooldown });
+    const last=Number.isFinite(rec.lastSprintAt)?Math.max(0,rec.lastSprintAt!):0;
+    if (now - last < P.SPRINT_COOLDOWN_MS) return this.game.send(l.ws, { t: 'toast', text: UI.sprintCooldown });
     const tr = this.track(this.game.map(rec)); if (Math.hypot(l.x - tr.x, l.y - tr.y) > 48) return this.game.send(l.ws, { t: 'toast', text: UI.raidTooFar });
-    this.sprints.set(rec.id, { startedAt: now, turned: false }); this.game.send(l.ws, { t: 'sprint', phase: 'start' });
+    this.sprints.set(rec.id, { startedAt: now, turned: false, villageId:this.game.vid(rec),socket:l.ws }); this.game.send(l.ws, { t: 'sprint', phase: 'start' });
   }
 
   /** Golden Hour: a reveal that rolled no mutation gets one more roll. */

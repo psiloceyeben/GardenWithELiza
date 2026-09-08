@@ -3,10 +3,15 @@ import type { Plant, Species } from '@shared/types';
 import * as E from '@shared/economy';
 import * as P from '@shared/protocol';
 import { COPY, TIER_NAME, MUTATION_NAME, MUTATION_FLAVOR, speciesById } from '../content';
-import type { WorldScene } from '../scenes/WorldScene';
+import type { WorldState } from '../game/WorldState';
 import { sfx } from '../audio';
 import { detectWallets } from '../wallet';
+import { Joystick } from '../game/joystick';
+import { viewMode } from '../view-mode';
+import { wardrobeHtml } from './wardrobe';
 import { MISSIONS, npcById, type MissionView } from '@shared/missions';
+
+export type HudController = Pick<WorldState, 'ask' | 'board' | 'bounties' | 'buySeed' | 'carrying' | 'chat' | 'connectWallet' | 'cosmetic' | 'emote' | 'event' | 'feed' | 'frameRect' | 'goHome' | 'interactNearest' | 'joy' | 'mission' | 'nick' | 'onlineCount' | 'postBounty' | 'refreshVillages' | 'selectedSeed' | 'selectSeed' | 'shop' | 'sprintStartedAt' | 'toggleZoom' | 'trophies' | 'unlinkWallet' | 'villageId' | 'villageName' | 'villages' | 'visit' | 'wardrobe' | 'you'>;
 
 type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land' | 'villages' | 'talk';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -18,7 +23,7 @@ export class Hud {
   private revealQueue: { plant: Plant; species: Species }[] = [];
   private touch = matchMedia('(pointer: coarse)').matches;
 
-  constructor(private scene: WorldScene) {
+  constructor(private scene: HudController) {
     for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('#bar button[data-panel]'))) {
       b.addEventListener('click', () => { const id = b.dataset.panel as PanelId; this.open_ === id ? this.close() : this.open(id); });
     }
@@ -30,11 +35,34 @@ export class Hud {
     mute.addEventListener('click', () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); });
     const chat = $<HTMLInputElement>('chat'); chat.placeholder = COPY.chatPlaceholder;
     chat.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { const t = chat.value.trim(); if (t) this.scene.chat(t); chat.value = ''; chat.blur(); } if (e.key === 'Escape') chat.blur(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && document.activeElement !== chat && $('modal').hidden && $('name-modal').hidden) { chat.focus(); e.preventDefault(); } });
+    document.addEventListener('keydown', (e) => {
+      const interactive = document.activeElement?.closest('button,input,textarea,select,a,[contenteditable=true],[role=button]');
+      // Let the focused control handle native keys, but do not send them onward
+      // to the game window's movement/interaction shortcuts.
+      if (interactive) { e.stopPropagation(); return; }
+      if (e.key === 'Enter' && !e.defaultPrevented && !e.isComposing && !interactive && $('modal').hidden && $('name-modal').hidden) { chat.focus(); e.preventDefault(); }
+    });
     if (this.touch) { $('joy').hidden = false; $('act').hidden = false; this.joystick(); $('act').addEventListener('pointerdown', (e) => { e.preventDefault(); this.scene.interactNearest(); }); }
   }
 
   // ------------------------------------------------------------ identity
+  sessionReplaced(): void {
+    this.signInNotice('session-replaced',COPY.sessionReplacedTitle,COPY.sessionReplaced,COPY.resumeHere,()=>location.reload());
+  }
+  identityRejected(recover:()=>void):void {
+    this.signInNotice('identity-rejected',COPY.signInAgain,COPY.identityRejected,COPY.signInAgain,recover);
+  }
+  private signInNotice(id:string,title:string,message:string,label:string,action:()=>void):void {
+    if(document.getElementById(id))return;
+    const dialog=document.createElement('dialog');dialog.id=id;
+    dialog.setAttribute('aria-label',title);
+    dialog.style.cssText='max-width:min(420px,85vw);padding:24px;background:#282036;color:#f0dfb0;border:3px solid #b99458;text-align:center;line-height:1.8';
+    const text=document.createElement('p');text.textContent=message;
+    const button=document.createElement('button');button.textContent=label;button.onclick=action;
+    dialog.append(text,button);dialog.addEventListener('cancel',event=>event.preventDefault());
+    document.body.append(dialog);dialog.showModal();button.focus();
+  }
+
   askName(cb: (name: string, walletId: string | null) => void): void {
     const m = $('name-modal'); m.hidden = false;
     $('name-title').textContent = COPY.signIn; $('name-go').textContent = COPY.guestEnter; $('name-or').textContent = COPY.orGuest; $('name-hint').textContent = COPY.walletHint;
@@ -55,12 +83,20 @@ export class Hud {
 
   // ------------------------------------------------------------ joystick (touch)
   private joystick(): void {
-    const zone = $('joy'); const knob = $('joy-knob'); let active = false; let ox = 0; let oy = 0;
-    const setv = (dx: number, dy: number) => { const len = Math.hypot(dx, dy); const r = 34; const c = Math.min(1, len / r); const nx = len ? dx / len : 0; const ny = len ? dy / len : 0; this.scene.joy = { x: nx * (c > 0.25 ? 1 : 0), y: ny * (c > 0.25 ? 1 : 0) }; knob.style.transform = `translate(${nx * c * r}px, ${ny * c * r}px)`; };
-    zone.addEventListener('pointerdown', (e) => { active = true; ox = e.clientX; oy = e.clientY; zone.setPointerCapture(e.pointerId); e.preventDefault(); });
-    zone.addEventListener('pointermove', (e) => { if (active) setv(e.clientX - ox, e.clientY - oy); });
-    const end = () => { active = false; setv(0, 0); };
-    zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
+    const zone = $('joy'); const knob = $('joy-knob'); const stick = new Joystick();
+    zone.style.touchAction = 'none';
+    const sync = () => { this.scene.joy = { ...stick.value }; knob.style.transform = `translate(${stick.knob.x}px, ${stick.knob.y}px)`; };
+    const reset = () => { const id = stick.pointer; stick.reset(); sync(); if (id !== null && zone.hasPointerCapture(id)) zone.releasePointerCapture(id); };
+    zone.addEventListener('pointerdown', (e) => {
+      if (!stick.start(e.pointerId, e.clientX, e.clientY)) return;
+      try { zone.setPointerCapture(e.pointerId); } catch { reset(); return; }
+      e.preventDefault(); sfx.unlock(); sync();
+    });
+    zone.addEventListener('pointermove', (e) => { stick.move(e.pointerId, e.clientX, e.clientY); sync(); });
+    const end = (e: PointerEvent) => { stick.end(e.pointerId); sync(); };
+    zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end); zone.addEventListener('lostpointercapture', end);
+    window.addEventListener('blur', reset);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) reset(); });
   }
 
   // ------------------------------------------------------------ basics
@@ -75,7 +111,28 @@ export class Hud {
     $('plots').textContent = `${you.plots.filter((p) => p).length}/${you.plotCount}`;
     $('village').textContent = `${this.scene.villageName}${you.visiting ? ` (${COPY.visit.toLowerCase()})` : ''} · ${this.scene.onlineCount()} ${COPY.here}`;
     const c = $('carry'); if (this.scene.carrying) { c.hidden = false; c.textContent = `${COPY.carrying} ${speciesById(this.scene.carrying).name}. ${COPY.runHome}`; } else c.hidden = true;
-    if (this.open_) this.render(this.open_);
+    if (this.open_) {
+      // State pushes rebuild panel contents; preserve the user's place while
+      // browsing long shop/wardrobe lists instead of jumping back to the top.
+      const panel = $('panel'), scrollTop = panel.scrollTop;
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement && active.id === 'npc-ask' && panel.contains(active)) return;
+      // Keep the actual input node (and selection/IME state) during typing.
+      // If its plant disappears or is replaced, render the authoritative state.
+      if (active instanceof HTMLInputElement && panel.contains(active) && active.dataset.nick !== undefined
+        && you.plots[Number(active.dataset.nick)]?.uid === active.dataset.plantUid) return;
+      const focusSelector = active instanceof HTMLButtonElement && panel.contains(active)
+        ? active.id ? `#${CSS.escape(active.id)}` : Array.from(active.attributes)
+          .filter(a => a.name.startsWith('data-'))
+          .map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('')
+        : '';
+      this.render(this.open_); panel.scrollTop = scrollTop;
+      if (focusSelector) {
+        const replacement = panel.querySelector<HTMLButtonElement>(focusSelector);
+        // Never move focus onto a different purchase if the original disappears.
+        (replacement && !replacement.disabled ? replacement : $('panel-close')).focus({ preventScroll:true });
+      }
+    }
   }
 
   open(id: PanelId): void { this.open_ = id; $('panel').hidden = false; if (id === 'villages') this.scene.refreshVillages(); this.render(id); }
@@ -117,7 +174,7 @@ export class Hud {
       title.textContent = COPY.seeds;
       if (!you.seeds.length) { body.innerHTML = `<div class="note">${COPY.emptySeeds}</div>`; return; }
       body.innerHTML = `<div class="note">${COPY.plantPrompt}</div><div class="seeds">${you.seeds.map((s) => { const sp = speciesById(s.speciesId);
-        return `<div class="seed ${this.scene.selectedSeed === s.uid ? 'sel' : ''}" data-seed="${s.uid}"><div class="icon" style="${this.iconStyle(sp.id, 'grow2')}"></div><div>${sp.name}</div><div class="t-${sp.tier}">${TIER_NAME[sp.tier]}</div></div>`; }).join('')}</div>`;
+        return `<button type="button" class="seed ${this.scene.selectedSeed === s.uid ? 'sel' : ''}" data-seed="${s.uid}" aria-pressed="${this.scene.selectedSeed === s.uid}" aria-label="${esc(sp.name)}"><span class="icon" aria-hidden="true" style="${this.iconStyle(sp.id, 'grow2')}"></span><span>${esc(sp.name)}</span><span class="t-${sp.tier}">${TIER_NAME[sp.tier]}</span></button>`; }).join('')}</div>`;
       body.querySelectorAll<HTMLElement>('[data-seed]').forEach((el) => el.addEventListener('click', () => this.scene.selectSeed(el.dataset.seed!)));
     } else if (id === 'shop') {
       title.textContent = COPY.shop;
@@ -138,12 +195,20 @@ export class Hud {
       body.innerHTML += `<div class="note">${COPY.cosmetics}</div>` + cosRow(COPY.cosFenceWood, 'fence_wood', c.fence === 'wood') + cosRow(COPY.cosFenceStone, 'fence_stone', c.fence === 'stone') + cosRow(COPY.cosFenceHedge, 'fence_hedge', c.fence === 'hedge')
         + cosRow(COPY.cosLantern, 'lantern', c.lantern) + cosRow(COPY.cosNameplate, 'nameplate', c.nameplate) + cosRow(COPY.cosPath, 'path', c.path)
         + cosRow(COPY.cosGhat0, 'ghat0', c.gnomeHat === 0, !hasGnome) + cosRow(COPY.cosGhat1, 'ghat1', c.gnomeHat === 1, !hasGnome) + cosRow(COPY.cosGhat2, 'ghat2', c.gnomeHat === 2, !hasGnome);
-      const hats = COPY.hatNames.split('|'); const shirtCols = ['#3c78dc', '#d03434', '#469640', '#9646b4', '#e88228', '#3caaa0'];
-      body.innerHTML += `<div class="note">${COPY.wardrobe}</div><div class="row"><span>${COPY.shirt} (${P.SHIRT_PRICE} ${COPY.sap})</span><span>${shirtCols.map((col, i) => `<button data-shirt="${i}" style="background:${col};width:22px;padding:6px 0" ${i === you.color ? 'disabled' : ''}> </button>`).join(' ')}</span></div>`
-        + hats.map((h, i) => `<div class="row"><span>${h}</span><span><span class="price">${i === you.hat ? COPY.worn : P.HAT_PRICES[i] ? `${P.HAT_PRICES[i]} ${COPY.sap}` : ''}</span> <button data-hat="${i}" ${i === you.hat ? 'disabled' : ''}>${COPY.wear}</button></span></div>`).join('');
+      const threeDWardrobe=viewMode(location.search).wander;
+      body.innerHTML += wardrobeHtml(you,threeDWardrobe);
+      if(threeDWardrobe){
+        const first=body.querySelector('[data-outfit]'),skin=you.skin??0;
+        void import('../three/wardrobe-preview').then(({populateWardrobePreviews})=>{
+          // A delayed import must not paint over a newer state or another panel.
+          if(first?.isConnected && body.querySelector('[data-outfit]')===first)populateWardrobePreviews(body,skin);
+        }).catch(()=>{/* Sprite fallback keeps the wardrobe usable if graphics fail. */});
+      }
       body.querySelectorAll<HTMLButtonElement>('[data-cos]').forEach((b) => b.addEventListener('click', () => this.scene.cosmetic(b.dataset.cos as P.CosmeticItem)));
       body.querySelectorAll<HTMLButtonElement>('[data-shirt]').forEach((b) => b.addEventListener('click', () => this.scene.wardrobe(Number(b.dataset.shirt), undefined)));
       body.querySelectorAll<HTMLButtonElement>('[data-hat]').forEach((b) => b.addEventListener('click', () => this.scene.wardrobe(undefined, Number(b.dataset.hat))));
+      body.querySelectorAll<HTMLButtonElement>('[data-hair]').forEach((b) => b.addEventListener('click', () => this.scene.wardrobe(undefined, undefined, undefined, Number(b.dataset.hair))));
+      body.querySelectorAll<HTMLButtonElement>('[data-skin]').forEach((b) => b.addEventListener('click', () => this.scene.wardrobe(undefined, undefined, Number(b.dataset.skin))));
       body.querySelectorAll<HTMLButtonElement>('[data-shop]').forEach((b) => b.addEventListener('click', () => this.scene.shop(b.dataset.shop as P.ShopItem)));
     } else if (id === 'feed') {
       title.textContent = COPY.board;
@@ -178,10 +243,21 @@ export class Hud {
         + (addr ? `<div class="row"><span>${COPY.landTree}</span><span>${stages[land.treeStage]}</span></div><div class="row"><span>${COPY.landStumps}</span><span>${land.witherMarks}</span></div><div class="row"><span>${COPY.landHybrids}</span><span>${land.hybrids ? '✓' : '—'}</span></div>` : '')
         + `<div class="note">${COPY.connectHint}</div><div class="buy" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">`
         + (addr ? `<button id="btn-share">${COPY.share}</button><button id="btn-unlink">${COPY.disconnect}</button>` : this.walletButtons()) + `</div>`;
-      body.querySelectorAll<HTMLButtonElement>('[data-wallet]').forEach((b) => b.addEventListener('click', () => void this.scene.connectWallet(b.dataset.wallet!)));
       const plants = you.plots.map((p, i) => p ? `<div class="row"><span>${esc(speciesById(p.speciesId).name)}</span><span><input data-nick="${i}" maxlength="14" value="${esc(p.nick ?? '')}" placeholder="${COPY.nickPrompt}" style="width:130px;padding:4px 6px;font-size:8px"></span></div>` : '').join('');
       body.innerHTML += `<div class="note">${COPY.myPlants}. ${COPY.nickHint}</div>${plants}`;
-      body.querySelectorAll<HTMLInputElement>('[data-nick]').forEach((inp) => { inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { this.scene.nick(Number(inp.dataset.nick), inp.value); inp.blur(); this.toast(COPY.nickSet); } }); inp.addEventListener('change', () => this.scene.nick(Number(inp.dataset.nick), inp.value)); });
+      body.querySelectorAll<HTMLButtonElement>('[data-wallet]').forEach((b) => b.addEventListener('click', () => void this.scene.connectWallet(b.dataset.wallet!)));
+      body.querySelectorAll<HTMLInputElement>('[data-nick]').forEach((inp) => {
+        const plotId = Number(inp.dataset.nick), uid = you.plots[plotId]!.uid;
+        inp.dataset.plantUid = uid;
+        inp.addEventListener('keydown', (e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); inp.blur(); }
+        });
+        inp.addEventListener('change', () => {
+          if (this.scene.you?.plots[plotId]?.uid !== uid) return;
+          this.scene.nick(plotId, inp.value); this.toast(COPY.nickSet);
+        });
+      });
       body.querySelector('#btn-unlink')?.addEventListener('click', () => this.scene.unlinkWallet());
       body.querySelector('#btn-share')?.addEventListener('click', () => { if (share) { navigator.clipboard?.writeText(share).catch(() => undefined); this.toast(`${COPY.shareCopied}: ${share}`, 5000); } });
     } else {
@@ -194,11 +270,21 @@ export class Hud {
 
   // ------------------------------------------------------------ town: NPC dialogue + missions
   private talkNpc: { npc: string; name: string; line: string; missions: MissionView[] } | null = null;
+  private talkDraft = '';
+  private talkReply: { name: string; text: string } | null = null;
+  private talkThinking = false;
+  private talkRequest: string | null = null;
+  private talkTimer = 0;
   talk(npc: string, name: string, line: string, missions: MissionView[]): void {
+    if (this.talkNpc?.npc !== npc) { this.talkDraft = ''; this.talkReply = null; this.talkThinking = false; this.talkRequest = null; window.clearTimeout(this.talkTimer); }
     const keepLine = this.talkNpc?.npc === npc && !line ? this.talkNpc.line : line;
     this.talkNpc = { npc, name, line: keepLine, missions }; this.open('talk');
   }
-  say(name: string, text: string): void {
+  say(name: string, text: string, npc: string, requestId?: string): void {
+    if (this.talkNpc?.npc !== npc) return;
+    if (requestId !== undefined ? requestId !== this.talkRequest : this.talkRequest !== null) return;
+    this.talkRequest = null; window.clearTimeout(this.talkTimer);
+    this.talkReply = { name, text }; this.talkThinking = false;
     const box = document.getElementById('npc-say'); if (box) { box.innerHTML = `<b>${esc(name)}</b> ${esc(text)}`; box.classList.remove('thinking'); }
   }
   private renderTalk(): void {
@@ -206,10 +292,17 @@ export class Hud {
     const label = (s: string) => s === 'available' ? COPY.accept : s === 'ready' ? COPY.claim : s === 'active' ? '' : COPY.missionTomorrow;
     body.innerHTML = `<div class="fe">${esc(t.line)}</div><div class="note">${COPY.missions}</div>`
       + (t.missions.length ? t.missions.map((m) => `<div class="item"><div><div class="name">${esc(m.title)} <span class="price">+${m.reward} ${COPY.sap}</span></div><div class="note">${esc(m.text)}</div></div><div class="buy"><span>${m.status === 'done' ? COPY.missionDone : `${m.progress}/${m.target}`}</span>${label(m.status) ? `<button data-mission="${m.id}" data-action="${m.status === 'ready' ? 'claim' : 'accept'}" ${m.status === 'done' ? 'disabled' : ''}>${label(m.status)}</button>` : ''}</div></div>`).join('') : `<div class="note">${COPY.noMissions}</div>`)
-      + `<div class="note">${COPY.ask}</div><div class="buy"><input id="npc-ask" maxlength="160" placeholder="${COPY.askPlaceholder}" style="flex:1"><button id="npc-ask-go">${COPY.ask}</button></div><div id="npc-say" class="note" style="min-height:24px"></div>`;
+      + `<div class="note">${COPY.ask}</div><div class="buy"><input id="npc-ask" maxlength="160" value="${esc(this.talkDraft)}" placeholder="${COPY.askPlaceholder}" style="flex:1"><button id="npc-ask-go">${COPY.ask}</button></div><div id="npc-say" class="note" style="min-height:24px">${this.talkReply ? `<b>${esc(this.talkReply.name)}</b> ${esc(this.talkReply.text)}` : this.talkThinking ? COPY.thinking : ''}</div>`;
     body.querySelectorAll<HTMLButtonElement>('[data-mission]').forEach((b) => b.addEventListener('click', () => this.scene.mission(b.dataset.mission!, b.dataset.action as 'accept' | 'claim')));
-    const inp = body.querySelector<HTMLInputElement>('#npc-ask')!; const go = () => { const q = inp.value.trim(); if (!q) return; inp.value = ''; const box = $('npc-say'); box.textContent = COPY.thinking; this.scene.ask(t.npc, q); };
-    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') go(); }); body.querySelector('#npc-ask-go')!.addEventListener('click', go);
+    const inp = body.querySelector<HTMLInputElement>('#npc-ask')!; const go = () => {
+      const q = inp.value.trim(); if (!q) return;
+      inp.value = ''; this.talkDraft = ''; this.talkReply = null; this.talkThinking = true;
+      const requestId = crypto.randomUUID(); this.talkRequest = requestId; window.clearTimeout(this.talkTimer);
+      this.talkTimer = window.setTimeout(() => this.say(t.name, COPY.askTimeout, t.npc, requestId), 25000);
+      $('npc-say').textContent = COPY.thinking; this.scene.ask(t.npc, q, requestId);
+    };
+    inp.addEventListener('input', () => { this.talkDraft = inp.value; });
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); go(); } }); body.querySelector('#npc-ask-go')!.addEventListener('click', go);
   }
 
   reveal(plant: Plant, species: Species): void { this.revealQueue.push({ plant, species }); if (this.revealQueue.length === 1) this.showReveal(); }

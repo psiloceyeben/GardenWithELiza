@@ -88,3 +88,13 @@ export function rollReveal(rng: () => number): { size: number; mutation: Mutatio
   const mutation = weightedPick(rng, MUTATIONS, (m) => m.odds).id;
   return { size, mutation };
 }
+
+/** One-time onboarding offer. Normal refreshed conveyors keep their tier odds. */
+export function rollStarterConveyor(rng: () => number, roster: Species[], plotCount: number): ConveyorSlot[] {
+  const slots = rollConveyor(rng, roster, 'common', plotCount);
+  const pool = roster.filter(s => s.tier === 'common' && !s.hybrid);
+  if (!pool.length) throw new Error('Starter conveyor requires a common non-hybrid species');
+  const sp = pool[Math.floor(rng() * pool.length)];
+  slots[0] = { speciesId: sp.id, tier: 'common', price: seedPrice('common', plotCount), sold: false };
+  return slots;
+}

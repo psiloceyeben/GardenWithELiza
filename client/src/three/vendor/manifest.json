@@ -1,0 +1,31 @@
+{
+  "origin": "/opt/wander-engine-v2/src/wag/client",
+  "esbuild": "0.25.12",
+  "files": {
+    "resolver/substrate.ts": "4193329edc74a34797821fce0aaf28bca926e16c719641d1df5fe2771ffa6105",
+    "resolver/relational.ts": "83cd9c3f1b2caf96724d38ecbe947d0d62fd3f00bcd5cea6892f5248bb59e1a3",
+    "textureToVector.ts": "6c0c6112c61a5e586897c2e2854ba73fdb4c5305f0f580a95a2caf036a355a25",
+    "clayShaderPatch.ts": "fe51587a5bef96876aa425c64ffa0969867e667fc6257059f9ac1c74f740e96a",
+    "materialRegistry.ts": "b3b3771af5c362313df72593e0b03b3cf8962df45e15ebaf4836af49a89d3d7b",
+    "characterRigContract.ts": "d3318bed7d357c365d19181f2dfda91a803265eda3dd9c3df197b176b75965bc",
+    "generators/materials.ts": "9c82fb44b9d59054f0b096c50ca4157ae879162716ab80b8cacbca58e3cb5b3b",
+    "hitbox.ts": "abc6174efcb669af700d1fd7196a57a84b885f4872005e579182d97906a543af",
+    "generators/wearable.ts": "35c8f911037979b2f0136f04ff8686aa336e30bbf0994b4d5c2282e8a99644bc",
+    "playerAvatar.ts": "b82e468e9c9da3fe5cca3cc7aa09943e20b18e27f14638de9ab4db92733769c8"
+  },
+  "patches": [
+    {
+      "file": "clayShaderPatch.ts",
+      "reason": "Release disposed materials from shader tuning registry",
+      "beforeSha256": "fe51587a5bef96876aa425c64ffa0969867e667fc6257059f9ac1c74f740e96a",
+      "afterSha256": "6957a208c93b0a23e538eaf0154cf4dec738607529450402db55dcf13967bb62"
+    },
+    {
+      "file": "playerAvatar.ts",
+      "reason": "Track all created materials including unused preset materials for disposal",
+      "beforeSha256": "b82e468e9c9da3fe5cca3cc7aa09943e20b18e27f14638de9ab4db92733769c8",
+      "afterSha256": "e1e54a4f59d39ea069eadd408576b3ce06b8a859b3a7d29d7a4a2cd807f726cd"
+    }
+  ],
+  "outputSha256": "42285a454e84a0c3ba17b5991ff550ba92b2b4648c98d1f09f8b8592a39b44d5"
+}

@@ -3,39 +3,50 @@ import path from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { Game } from './game';
 import * as P from '../../shared/protocol';
-import type { ClientMsg } from '../../shared/protocol';
+import { isClientMsg } from './validate-message';
 import { deriveGarden } from '../../shared/derive';
 import { renderLot, type ShareLot } from '../../share/render';
 import copyJson from '../../content/copy.json';
+import { ImageCache } from './image-cache';
+import { SocketLifecycle } from './socket-lifecycle';
+import { originPolicy } from './origin-policy';
+import { SignupBudget } from './signup-budget';
 
 const PORT = Number(process.env.PONS_PORT ?? 8130);
 const DATA = process.env.PONS_DATA ?? path.resolve(__dirname, '../../../../data');
 const SPRITES = process.env.PONS_SPRITES ?? path.resolve(__dirname, '../../../../client/public/sprites');
-const PUBLIC_BASE = (process.env.PONS_PUBLIC_BASE ?? 'https://prometheus7.com/pons').replace(/\/$/, '');
+const PUBLIC_BASE = (process.env.PONS_PUBLIC_BASE ?? 'https://prometheus7.com/ponsgarden').replace(/\/$/, '');
+const allowOrigin = originPolicy(PUBLIC_BASE, process.env.PONS_ALLOWED_ORIGINS);
 const game = new Game(DATA);
+let stopping = false;
+const pendingHandlers = new Set<Promise<void>>();
+const signupBudget = new SignupBudget(Number(process.env.PONS_SIGNUP_BURST ?? 200), Number(process.env.PONS_SIGNUP_REFILL_MS ?? 30000));
 
 // ------------------------------------------------------------ share pages (bible §6.4): any wallet is a garden
-const pngCache = new Map<string, { at: number; buf: Buffer }>();
+const pngCache = new ImageCache();
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
 async function shareLot(address: string): Promise<ShareLot> {
   const rec = [...game.players.values()].find((r) => r.address === address);
-  const spec = rec?.garden ?? deriveGarden(address, await game.reader.snapshot(address));
+  const derived = rec?.garden ?? deriveGarden(address, await game.reader.snapshot(address));
+  const spec = rec ? { ...derived, plotCount: rec.plotCount } : derived;
   const plants = rec ? rec.plots.map((p, i) => p ? { i, speciesId: p.speciesId, revealed: p.revealed, mutation: p.mutation, size: p.size } : null).filter((x): x is NonNullable<typeof x> => !!x) : [];
   return { spec, plants, name: rec?.name ?? null };
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', 'http://x');
   try {
-    if (url.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, players: game.players.size, online: game.live.size, villages: game.villages.size, reader: game.reader.kind })); return; }
+    const url = new URL(req.url ?? '/', 'http://x');
+    res.setHeader('x-content-type-options', 'nosniff');
+    if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { allow: 'GET, HEAD' }); res.end('method not allowed'); return; }
+    if (url.pathname === '/health') { const ok = !stopping && !game.store.failed; res.writeHead(ok ? 200 : 503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok, players: game.players.size, online: game.live.size, villages: game.villages.size, reader: game.reader.kind, storage: game.store.kind, lastSavedAt: game.store.lastSavedAt })); return; }
     const m = url.pathname.match(/^\/garden\/(0x[0-9a-fA-F]{40})(\.png)?$/);
     if (!m) { res.writeHead(404); res.end('not found'); return; }
     const address = m[1].toLowerCase();
     if (m[2]) {
       const hit = pngCache.get(address);
-      const buf = hit && Date.now() - hit.at < 300_000 ? hit.buf : renderLot(SPRITES, await shareLot(address));
-      pngCache.set(address, { at: Date.now(), buf });
+      const buf = hit ?? renderLot(SPRITES, await shareLot(address));
+      if (!hit) pngCache.set(address, buf);
       res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=300' }); res.end(buf); return;
     }
     const lot = await shareLot(address); const s = lot.spec; const img = `${PUBLIC_BASE}/garden/${address}.png`;
@@ -51,25 +62,60 @@ const server = http.createServer(async (req, res) => {
 });
 
 // ------------------------------------------------------------ websocket
-const wss = new WebSocketServer({ server, maxPayload: 64 * 1024 });
+const wss = new WebSocketServer({ server, maxPayload: 64 * 1024,
+  verifyClient: (info: { req: http.IncomingMessage }) => !stopping && allowOrigin(info.req.headers.origin, info.req.socket.remoteAddress),
+});
+const socketLifecycles = new Map<WebSocket, SocketLifecycle>();
 wss.on('connection', (ws: WebSocket) => {
+  // Leave headroom above the 200-player target, while bounding idle sockets too.
+  if (stopping || wss.clients.size > 512) { ws.terminate(); return; }
+  const lifecycle = new SocketLifecycle(ws, Date.now()); socketLifecycles.set(ws, lifecycle);
+  ws.on('pong', () => lifecycle.pong());
   let liveId: string | null = null; let msgs = 0; let window = Date.now();
   ws.on('message', (raw) => {
+    if (stopping || game.store.failed) { ws.close(1013, 'storage unavailable'); return; }
     const now = Date.now(); if (now - window > 1000) { window = now; msgs = 0; }
     if (++msgs > 60) { ws.close(1008, 'rate'); return; }
-    let m: ClientMsg; try { m = JSON.parse(String(raw)); } catch { return; }
-    if (!m || typeof m.t !== 'string') return;
-    if (!liveId) { if (m.t !== 'hello') return; const l = game.join(ws, m); if (l) liveId = l.id; return; }
+    let m: unknown; try { m = JSON.parse(String(raw)); } catch { ws.close(1008, 'invalid message'); return; }
+    if (!isClientMsg(m)) { ws.close(1008, 'invalid message'); return; }
+    if (!liveId) {
+      if (m.t !== 'hello') { ws.close(1008, 'hello required'); return; }
+      if (!game.players.has(m.id) && !signupBudget.take(now)) { ws.close(1013, 'new gardens busy; retry later'); return; }
+      try { const l = game.join(ws, m); if (l) { liveId = l.id; lifecycle.authenticate(); } else ws.close(1008, 'invalid hello'); }
+      catch { ws.close(1008, 'invalid hello'); }
+      return;
+    }
     const l = game.live.get(liveId); if (!l || l.ws !== ws) return;
-    try { const r = game.handle(l, m); if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch((e) => console.error('handle', m.t, e)); } catch (e) { console.error('handle', m.t, e); }
+    try { const r = game.handle(l, m); if (r && typeof (r as Promise<void>).catch === 'function') { const task = (r as Promise<void>).catch(() => console.error('handle failed', m.t)).finally(() => pendingHandlers.delete(task)); pendingHandlers.add(task); } } catch { console.error('handle failed', m.t); }
   });
-  ws.on('close', () => { if (liveId) { const l = game.live.get(liveId); if (l && l.ws === ws) game.leave(liveId); } });
+  ws.on('close', () => { socketLifecycles.delete(ws); if (liveId) { const l = game.live.get(liveId); if (l && l.ws === ws) game.leave(liveId); } });
   ws.on('error', () => undefined);
 });
 
-setInterval(() => { try { game.tick(Date.now()); } catch (e) { console.error('tick', e); } }, P.TICK_MS);
-setInterval(() => { try { game.snapshot(Date.now()); } catch (e) { console.error('snap', e); } }, P.SNAP_MS);
-setInterval(() => { try { game.economy(Date.now()); } catch (e) { console.error('econ', e); } }, 1000);
-setInterval(() => game.store.flush(), 10_000);
-for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => { game.store.flush(); process.exit(0); });
-server.listen(PORT, '0.0.0.0', () => console.log(`pons server :${PORT} data=${DATA} reader=${game.reader.kind} players=${game.players.size} villages=${game.villages.size}`));
+async function start(): Promise<void> {
+  await game.initialize();
+  const timers = [
+    setInterval(() => { const now = Date.now(); for (const lifecycle of socketLifecycles.values()) lifecycle.check(now); }, 5000),
+    setInterval(() => { if (!stopping && !game.store.failed) try { game.tick(Date.now()); } catch { console.error('tick failed'); } }, P.TICK_MS),
+    setInterval(() => { if (!stopping && !game.store.failed) try { game.snapshot(Date.now()); } catch { console.error('snapshot failed'); } }, P.SNAP_MS),
+    setInterval(() => { if (!stopping && !game.store.failed) try { game.economy(Date.now()); } catch { console.error('economy failed'); } }, 1000),
+    setInterval(() => { if (!stopping) void game.commit().catch(() => console.error('persistence failed; gameplay paused')); }, P.TICK_MS),
+  ];
+  for (const sig of ['SIGINT','SIGTERM'] as const) process.on(sig, () => {
+    if (stopping) return; stopping = true;
+    timers.forEach(clearInterval); server.close();
+    const deadline = setTimeout(() => process.exit(1), 20000); deadline.unref();
+    void (async () => {
+      await Promise.allSettled([...pendingHandlers]);
+      for (const id of [...game.live.keys()]) game.leave(id, true);
+      await game.commit(); await game.store.close();
+      for (const ws of wss.clients) ws.terminate();
+      clearTimeout(deadline); process.exit(0);
+    })().catch(() => { console.error('shutdown save failed'); process.exit(1); });
+  });
+  server.listen(PORT, process.env.PONS_HOST ?? '0.0.0.0', () => {
+    const address = server.address();
+    console.log(`pons server :${address && typeof address !== 'string' ? address.port : PORT} storage=${game.store.kind} reader=${game.reader.kind} players=${game.players.size} villages=${game.villages.size}`);
+  });
+}
+void start().catch(() => { console.error('Startup failed: check storage configuration and migration inputs'); process.exit(1); });

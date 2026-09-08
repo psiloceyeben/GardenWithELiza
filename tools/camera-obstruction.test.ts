@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { Box3, Vector3 } from 'three';
+import { unobstructedCamera } from '../client/src/three/camera-obstruction';
+const origin=new Vector3(), desired=new Vector3(0,0,10);
+const wall=new Box3(new Vector3(-2,-2,4),new Vector3(2,2,6));
+assert.deepEqual(unobstructedCamera(origin,desired,[]).toArray(),desired.toArray());
+const clipped=unobstructedCamera(origin,desired,[wall]);
+assert(clipped.z > 3.7 && clipped.z < 3.75); assert(!wall.containsPoint(clipped));
+const behind=new Box3(new Vector3(-2,-2,12),new Vector3(2,2,14));
+assert.deepEqual(unobstructedCamera(origin,desired,[behind]).toArray(),desired.toArray());
+const side=new Box3(new Vector3(3,-2,3),new Vector3(5,2,6));
+assert.deepEqual(unobstructedCamera(origin,desired,[side]).toArray(),desired.toArray());
+assert.deepEqual(unobstructedCamera(origin,desired,[behind,wall]).toArray(),clipped.toArray());
+assert.deepEqual(unobstructedCamera(new Vector3(0,0,5),desired,[wall]).toArray(),[0,0,5]);
+assert.deepEqual(unobstructedCamera(origin,origin,[wall]).toArray(),[0,0,0]);
+assert.deepEqual(origin.toArray(),[0,0,0]); assert.deepEqual(desired.toArray(),[0,0,10]);
+console.log('PASS camera-only obstruction, clearance, nearest blocker, no-hit and degenerate cases');

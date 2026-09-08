@@ -3,10 +3,7 @@ import type { GameState } from '@shared/types';
 const KEY = 'pons.save.v1';
 
 export function takeLegacySave(): GameState | null {
-  try {
-    const raw = localStorage.getItem(KEY); if (!raw) return null;
-    const st = JSON.parse(raw) as GameState;
-    localStorage.removeItem(KEY);
-    return st.version === 1 ? st : null;
-  } catch { return null; }
+  // Preserve old local data for an explicit migration/export decision. Do not
+  // transmit client-controlled inventory or delete it on an attempted sign-in.
+  return null;
 }

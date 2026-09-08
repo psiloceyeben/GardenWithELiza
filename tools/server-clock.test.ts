@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {ServerClock} from '../client/src/game/server-clock';
+import {gnomePatrol} from '../shared/gnome-patrol';
+let mono=10;const clock=new ServerClock(()=>mono,0);
+clock.sample(1800000000000);mono+=250;assert.equal(clock.now(),1800000000250);
+clock.sample(NaN);clock.sample(-1);clock.sample(Infinity);assert.equal(clock.now(),1800000000250);
+clock.sample(1800000000500);mono+=50;assert.equal(clock.now(),1800000000550);
+const c={x:100,y:200};
+assert.deepEqual(gnomePatrol(c,0),{x:152,y:200,angle:0});
+const p=gnomePatrol(c,Math.PI*750);assert(Math.abs(p.x-100)<1e-9 && Math.abs(p.y-240)<1e-9);
+console.log('PASS server timestamp sampling, monotonic interpolation, malformed samples and shared patrol phase');

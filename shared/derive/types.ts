@@ -11,7 +11,7 @@ export interface ChainSnapshot {
   stakeTime: number;            // Σ(balance × days) — token-days
   holdStreakDays: number;       // days since last balance decrease
   unstakeEvents: UnstakeEvent[];
-  walletAgeDays: number;        // since first tx on Robinhood Chain
+  walletAgeDays: number;        // since first tx on Robinhood Chain; 0 when unavailable (RPC reader has no first-tx indexer yet)
   ecosystemHoldings: Record<string, number>;  // allowlisted MEME tokens only (never stock tokens / broker NFTs)
   stockDecor: { brokerNfts: number; stockTokenKinds: number; drops: number };  // counts only; feeds visuals only (I-3)
 }

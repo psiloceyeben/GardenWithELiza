@@ -9,6 +9,7 @@ export default defineConfig({
       '@content': fileURLToPath(new URL('../content', import.meta.url)),
     },
   },
-  server: { host: true, port: 5173, fs: { allow: ['..'] } },
+  // Development is accessed through an SSH tunnel, not a public listener.
+  server: { host: '127.0.0.1', port: 5173, fs: { allow: ['..'] } },
   build: { outDir: 'dist', assetsInlineLimit: 0, target: 'es2020' },
 });

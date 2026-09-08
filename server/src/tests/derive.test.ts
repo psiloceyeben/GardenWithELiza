@@ -32,7 +32,7 @@ ok(addressHash('0xabc') === addressHash('0xABC'), 'addressHash case-insensitive'
 (async () => {
   const r = new CachedReader(new MockReader(), 60_000);
   const s1 = await r.snapshot('0x1234567890abcdef1234567890abcdef12345678'); const s2 = await r.snapshot('0x1234567890ABCDEF1234567890ABCDEF12345678');
-  ok(s1 === s2, 'cached reader returns the same object within TTL');
+  ok(s1 !== s2 && JSON.stringify(s1) === JSON.stringify(s2), 'cached reader returns isolated equal snapshots within TTL');
   const fx = await r.snapshot(FIXTURES[2].snapshot.address);
   ok(fx.stakeTime === FIXTURES[2].snapshot.stakeTime, 'mock reader serves fixture wallets');
 

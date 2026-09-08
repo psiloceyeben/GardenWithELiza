@@ -5,13 +5,16 @@ import * as P from '@shared/protocol';
 import type { ServerMsg, PrivateState, PublicLot, SnapPlayer, Dir, FeedEvent } from '@shared/protocol';
 import { buildVillage, moveActor, findPath, lotAtPx, lotGatePx, TILE, TILE_STRIDE, T, VILLAGE_W, VILLAGE_H, type Village, type Lot } from '@shared/world';
 import { speciesById, COPY } from '../content';
-import { Net, wsUrl, loadIdentity, newIdentity, saveIdentity, type Identity } from '../net';
-import { hasWallet, connectAddress, signMessageWith } from '../wallet';
+import { Net, wsUrl, loadIdentity, newIdentity, saveIdentity, discardRejectedIdentity, type Identity } from '../net';
+import { hasWallet, connectAddress, signMessageWith, cancelWallet, walletFailureKey } from '../wallet';
 import { BIOME_COUNT } from '@shared/derive/constants';
 import { npcById } from '@shared/missions';
 import { takeLegacySave } from '../state';
 import { Hud } from '../ui/hud';
 import { sfx } from '../audio';
+import { predictMovement } from '../game/movement';
+import { ServerClock } from '../game/server-clock';
+import { gnomePatrol } from '@shared/gnome-patrol';
 
 const INTERACT_RADIUS = 40;
 
@@ -30,6 +33,7 @@ interface LotView {
 interface Remote { sprite: Phaser.GameObjects.Sprite; tag: Phaser.GameObjects.Text; tx: number; ty: number; d: Dir; f: boolean; m: boolean; carry: Phaser.GameObjects.Image | null; carryId: string; bubble: Phaser.GameObjects.Text | null; bubbleUntil: number; color: number; hat: number; }
 
 export class WorldScene extends Phaser.Scene {
+  readonly serverClock=new ServerClock();
   net!: Net;
   identity!: Identity;
   hud!: Hud;
@@ -101,7 +105,12 @@ export class WorldScene extends Phaser.Scene {
     this.hud.toast(COPY.connecting, 4000);
     this.net = new Net(wsUrl());
     this.net.onOpen = () => this.net.send({ t: 'hello', id: id.id, secret: id.secret, name: id.name, save: takeLegacySave() });
-    this.net.onClose = () => { if (this.ready) this.hud.toast(COPY.disconnected, 3000); };
+    this.net.onClose = (reason) => {
+      cancelWallet(); this.pendingAddress = null; this.linking = false; this.ready=false;
+      if(reason==='session-replaced')this.hud.sessionReplaced();
+      else if(reason==='identity-rejected')this.hud.identityRejected(()=>{if(discardRejectedIdentity(id))location.reload();else this.hud.toast(COPY.signInStorageBlocked);});
+      else this.hud.toast(COPY.disconnected,3000);
+    };
     this.net.onMsg = (m) => this.onMsg(m);
     this.net.connect();
   }
@@ -155,6 +164,7 @@ export class WorldScene extends Phaser.Scene {
   onMsg(m: ServerMsg): void {
     switch (m.t) {
       case 'welcome': {
+        this.serverClock.sample(m.now);
         if (this.village && m.village.id !== this.villageId) { this.net.close(); location.reload(); return; }
         if (!this.village) { this.buildWorld(m.village.seed, m.village.biome); }
         this.villageId = m.village.id; this.villages = m.villages;
@@ -171,7 +181,14 @@ export class WorldScene extends Phaser.Scene {
         this.hud.toast(`${COPY.village}: ${this.villageName}. ${COPY.controls}`, 6000);
         break;
       }
+      case 'correction': {
+        this.player.setPosition(m.x, m.y);
+        this.path = []; this.pathAct = null; this.moving = false;
+        this.player.setData('dirty', true);
+        break;
+      }
       case 'snap': {
+        this.serverClock.sample(m.now);
         const seen = new Set<string>();
         for (const p of m.p) { seen.add(p.id); if (p.id === this.you?.id) { if (Math.hypot(p.x - this.player.x, p.y - this.player.y) > 48) this.player.setPosition(p.x, p.y); } else this.applySnap(p); this.setWanted(p.id, !!p.b); }
         for (const [id, r] of this.remotes) if (!seen.has(id)) { this.destroyRemote(r); this.remotes.delete(id); this.setWanted(id, false); }
@@ -206,7 +223,7 @@ export class WorldScene extends Phaser.Scene {
       case 'nonce': void this.onNonce(m.address, m.message); break;
       case 'identity': saveIdentity({ id: m.id, secret: m.secret, name: m.name }); this.net.close(); setTimeout(() => location.reload(), 600); break;
       case 'npc': this.hud.talk(m.npc, m.name, m.line, m.missions); break;
-      case 'say': this.hud.say(m.name, m.text); { const s = this.npcSprites.get(m.npc); if (s) this.bubbleAt(s.x, s.y - 34, m.text.slice(0, 60)); } break;
+      case 'say': this.hud.say(m.name, m.text, m.npc, m.requestId); { const s = this.npcSprites.get(m.npc); if (s) this.bubbleAt(s.x, s.y - 34, m.text.slice(0, 60)); } break;
       case 'linked': if (this.you) { this.you.land = m.land; this.you.plotCount = m.plotCount; this.you.rarityFloor = m.rarityFloor; } this.hud.refresh(); if (m.address) this.hud.open('land'); break;
       case 'pong': break;
     }
@@ -367,19 +384,25 @@ export class WorldScene extends Phaser.Scene {
   // ------------------------------------------------------------ wallet (read-only)
   async connectWallet(walletId: string): Promise<void> {
     if (this.linking) return;
+    clearTimeout(this.walletTimer);
+    if (!this.net.connected) { this.hud.toast(COPY.disconnected, 3000); return; }
     if (!hasWallet()) { this.hud.toast(COPY.noWallet, 5000); return; }
     this.linking = true; this.walletId = walletId;
     try {
       const address = await connectAddress(walletId);
       this.pendingAddress = address; this.net.send({ t: 'nonce', address });
-    } catch { this.linking = false; this.hud.toast(COPY.noWallet, 4000); }
+      this.walletTimer = setTimeout(() => { if (this.pendingAddress === address) { this.pendingAddress = null; this.linking = false; cancelWallet(); this.hud.toast(COPY.linkFail, 4000); } }, 30_000);
+    } catch (error) { this.linking = false; this.hud.toast(COPY[walletFailureKey(error) ?? 'noWallet'], 4000); }
   }
   pendingAddress: string | null = null;
+  private walletTimer?: ReturnType<typeof setTimeout>;
   walletId = 'metamask';
   async onNonce(address: string, message: string): Promise<void> {
-    if (address !== this.pendingAddress) { this.linking = false; return; }
+    if (address !== this.pendingAddress) return;
+    clearTimeout(this.walletTimer);
+    this.pendingAddress = null;
     try { this.hud.toast(COPY.signing, 6000); const signature = await signMessageWith(this.walletId, address, message); this.net.send({ t: 'link', address, signature }); }
-    catch { this.hud.toast(COPY.linkFail, 4000); }
+    catch (error) { this.hud.toast(COPY[walletFailureKey(error) ?? 'linkFail'], 4000); }
     finally { this.linking = false; }
   }
   /** Zoom: close (follows you) → half (follows you) → whole map (fixed) → close. The HUD is DOM so it stays crisp. */
@@ -397,7 +420,7 @@ export class WorldScene extends Phaser.Scene {
       this.night.setSize(640 / z, 360 / z);
     }
   }
-  unlinkWallet(): void { this.net.send({ t: 'unlink' }); }
+  unlinkWallet(): void { cancelWallet(); this.pendingAddress = null; this.linking = false; this.net.send({ t: 'unlink' }); }
 
   applyMutation(view: LotView, i: number, s: Phaser.GameObjects.Sprite, mutation: string, pos: { x: number; y: number }): void {
     const fx: Phaser.GameObjects.GameObject[] = [];
@@ -453,10 +476,7 @@ export class WorldScene extends Phaser.Scene {
     const wasMoving = this.moving;
     if (dx || dy) {
       if (this.channel) { this.channel = null; this.net.send({ t: 'cancel' }); }
-      const len = Math.hypot(dx, dy) || 1;
-      let sp = P.BASE_SPEED * E.speedMult(this.you!.speedLevel);
-      if (this.carrying) { sp *= P.CARRY_SPEED; const inLot = lotAtPx(this.village!, this.player.x, this.player.y); const owner = inLot ? [...this.lots.values()].find((v) => v.geo.id === inLot.id) : null; if (owner && owner.lot.ownerId !== this.you!.id && owner.lot.defenses.sprinkler) sp *= P.SPRINKLER_SPEED; }
-      const r = moveActor(this.village!, this.player.x, this.player.y, (dx / len) * sp * dt, (dy / len) * sp * dt, this.gateClosed);
+      const r = predictMovement(this.village!, this.player, { x: dx, y: dy }, dt, this.you!.speedLevel, this.carrying, this.you!.id, [...this.lots.values()], this.gateClosed);
       if (r.x === this.player.x && r.y === this.player.y && this.path.length) { this.path = []; this.pathAct = null; }
       this.player.setPosition(r.x, r.y);
       if (Math.abs(dx) > Math.abs(dy)) { this.dir = 'side'; this.flip = dx < 0; } else this.dir = dy < 0 ? 'up' : 'down';
@@ -485,7 +505,12 @@ export class WorldScene extends Phaser.Scene {
       this.wanted.get(r.sprite.getData('id') as string)?.setPosition(s.x, s.y - 38);
       if (r.bubble) { r.bubble.setPosition(s.x, s.y - 40); if (now > r.bubbleUntil) { r.bubble.destroy(); r.bubble = null; } }
     }
-    for (const v of this.lots.values()) if (v.gnome) { const a = now / 1500; v.gnome.setPosition(v.geo.center.x + Math.cos(a) * 52, v.geo.center.y + Math.sin(a) * 40).setDepth(v.gnome.y).setFlipX(Math.sin(a) < 0); const gh = v.gnome.getData('hat') as Phaser.GameObjects.Image | undefined; gh?.setPosition(v.gnome.x, v.gnome.y - 28).setDepth(v.gnome.y + 1); }
+    for (const v of this.lots.values()) if (v.gnome) {
+      const stamp=this.serverClock.now(),p=gnomePatrol(v.geo.center,stamp);
+      v.gnome.setPosition(p.x,p.y).setDepth(p.y).setFlipX(Math.sin(p.angle)<0).setData('patrolAt',stamp);
+      const gh=v.gnome.getData('hat') as Phaser.GameObjects.Image|undefined;
+      gh?.setPosition(p.x,p.y-28).setDepth(p.y+1);
+    }
   }
 
   drawOverlays(now: number): void {
@@ -617,8 +642,8 @@ export class WorldScene extends Phaser.Scene {
   }
   cosmetic(item: P.CosmeticItem): void { this.net.send({ t: 'cosmetic', item }); sfx.buy(); }
   mission(id: string, action: 'accept' | 'claim'): void { this.net.send({ t: 'mission', id, action }); if (action === 'claim') sfx.fanfare(); else sfx.tend(); }
-  ask(npc: string, text: string): void { this.net.send({ t: 'ask', npc, text }); }
-  wardrobe(shirt?: number, hat?: number): void { this.net.send({ t: 'wardrobe', shirt, hat }); sfx.buy(); }
+  ask(npc: string, text: string, requestId?: string): void { this.net.send({ t: 'ask', npc, text, requestId }); }
+  wardrobe(shirt?: number, hat?: number, skin?: number, hair?: number): void { this.net.send({ t: 'wardrobe', shirt, hat, skin, hair }); sfx.buy(); }
   nick(plotId: number, name: string): void { this.net.send({ t: 'nick', plotId, name }); }
   visit(villageId: string): void { this.net.send({ t: 'visit', village: villageId }); this.hud.close(); }
   goHome(): void { this.net.send({ t: 'home' }); this.hud.close(); }

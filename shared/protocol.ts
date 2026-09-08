@@ -23,9 +23,13 @@ export const COSMETIC_PRICES: Record<CosmeticItem, number> = { fence_stone: 600,
 export const HAT_PRICES = [0, 200, 800, 300];     // straw, cap, top hat, bandana
 export const SHIRT_PRICE = 50;
 export const HAT_COUNT = 4;
+export const HAIR_STYLES = ['short', 'long', 'bun', 'ponytail', 'shaved'] as const;
+export const SKIN_TONES = ['#f0d4a8', '#f6dfcf', '#d8b48c', '#b98057', '#8b593e', '#54392f'] as const;
 export interface Weekly { week: string; steals: number; tags: number; heistTier: number; heistSpecies: string; }
 export interface Trophies { week: string; steals: { name: string; n: number }[]; tags: { name: string; n: number }[]; heists: { name: string; species: string; tier: Tier }[]; }
-export interface NameEntry { name: string; color: number; hat: number; }
+export const SESSION_REPLACED_CLOSE = 4001;
+export const IDENTITY_REJECTED_CLOSE = 4003;
+export interface NameEntry { name: string; color: number; hat: number; skin?: number; hair?: number; }
 export interface VillageInfo { id: string; name: string; online: number; free: number; }
 export interface Thief { id: string; name: string; at: number; }
 
@@ -76,11 +80,14 @@ export interface PrivateState {
   stolenBy: Thief[];         // who robbed you in the last hour (bounty targets)
   cosmetics: Cosmetics;
   hat: number;
+  hats?: number[]; // owned wardrobe choices; absent on older servers
+  skin?: number; hair?: number; // free appearance choice; absent on older saves/servers
   weekly: Weekly;
   missions: MissionState;
 }
 
-export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; b?: boolean; }
+export interface CarryAppearance { mutation: MutationId; size: number; }
+export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; b?: boolean; cp?: CarryAppearance; }
 
 export type ClientMsg =
   | { t: 'hello'; id: string; secret: string; name: string; save?: GameState | null; village?: string }
@@ -105,11 +112,11 @@ export type ClientMsg =
   | { t: 'home' }
   | { t: 'villages' }
   | { t: 'cosmetic'; item: CosmeticItem }
-  | { t: 'wardrobe'; shirt?: number; hat?: number }
+  | { t: 'wardrobe'; shirt?: number; hat?: number; skin?: number; hair?: number }
   | { t: 'nick'; plotId: number; name: string }
   | { t: 'talk'; npc: string }
   | { t: 'mission'; id: string; action: 'accept' | 'claim' }
-  | { t: 'ask'; npc: string; text: string }
+  | { t: 'ask'; npc: string; text: string; requestId?: string }
   | { t: 'ping'; n: number };
 
 export interface MissionState { active: Record<string, number>; done: Record<string, string>; }   // done[id] = day key
@@ -122,6 +129,7 @@ export type ServerMsg =
   | { t: 'welcome'; you: PrivateState; village: { id: string; seed: number; biome: number; name: string }; lots: PublicLot[]; players: SnapPlayer[]; names: Record<string, NameEntry>; feed: FeedEvent[]; now: number; villages: VillageInfo[] }
   | { t: 'villages'; list: VillageInfo[] }
   | { t: 'snap'; now: number; p: SnapPlayer[] }
+  | { t: 'correction'; x: number; y: number } // rejected prediction; applies even below ordinary snapshot tolerance
   | { t: 'state'; you: Partial<PrivateState> }
   | { t: 'lot'; lot: PublicLot }
   | { t: 'players'; names: Record<string, NameEntry>; left?: string[] }
@@ -131,13 +139,13 @@ export type ServerMsg =
   | { t: 'chat'; id: string; name: string; text: string }
   | { t: 'emote'; id: string; e: number }
   | { t: 'channel'; kind: 'uproot' | 'break' | null; endsAt: number; startedAt: number }
-  | { t: 'carry'; speciesId: string | null }
-  | { t: 'error'; text: string }
+  | { t: 'carry'; speciesId: string | null; appearance?: CarryAppearance }
+  | { t: 'error'; text: string; code?: 'session-replaced' | 'identity-rejected' }
   | { t: 'nonce'; address: string; message: string }
   | { t: 'linked'; address: string | null; land: LandView; plotCount: number; rarityFloor: Tier }
   | { t: 'identity'; id: string; secret: string; name: string }   // wallet sign-in adopted an existing player: store and reconnect as them
   | { t: 'npc'; npc: string; name: string; line: string; missions: import('./missions').MissionView[] }
-  | { t: 'say'; npc: string; name: string; text: string; oracle: boolean }
+  | { t: 'say'; npc: string; name: string; text: string; oracle: boolean; requestId?: string }
   | { t: 'wild'; add?: Wild[]; remove?: string[]; all?: Wild[] }
   | { t: 'event'; ev: VillageEvent | null }
   | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {layoutLabels} from '../client/src/three/label-layout';
+const input=[{id:'npc',x:100,y:100,width:100,height:14},{id:'player',x:100,y:102,width:80,height:14}];
+const result=layoutLabels(input,320);
+assert.equal(result.get('npc')!.y,100);
+assert(result.get('player')!.y<=83);
+assert.deepEqual(layoutLabels([...input].reverse(),320),result);
+assert.equal(input[1].y,102);
+const edge=layoutLabels([{id:'edge',x:0,y:20,width:60,height:14}],320).get('edge')!;
+assert.equal(edge.x,33);assert.equal(edge.hidden,false);
+assert.equal(layoutLabels([{id:'top',x:100,y:5,width:60,height:14}],320).get('top')!.hidden,true);
+assert.equal(layoutLabels([],320).size,0);
+console.log('PASS label collision stacking, stable order, viewport edge and top clipping');

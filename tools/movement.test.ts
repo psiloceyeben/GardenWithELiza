@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { buildVillage, TILE, T } from '@shared/world';
+import type { PublicLot } from '@shared/protocol';
+import { predictMovement } from '../client/src/game/movement';
+
+// Run on Box C via esbuild (platform=node); never included by the browser entry.
+const village=buildVillage(42),geo=village.lots[0];
+const lot={ownerId:'other',defenses:{sprinkler:false,mud:false}} as PublicLot;
+const lots=[{geo,lot}],position={x:geo.center.x,y:geo.center.y};
+const move=(x:number,y:number,carry:string|null=null,dt=0.05)=>predictMovement(village,position,{x,y},dt,0,carry,'me',lots,()=>false);
+const distance=(p:{x:number;y:number})=>Math.hypot(p.x-position.x,p.y-position.y);
+const normal=distance(move(1,0));
+assert.equal(normal,4.5);
+assert.ok(Math.abs(distance(move(1,1))-normal)<1e-9,'diagonal movement must not be faster');
+assert.ok(Math.abs(distance(move(1,0,'plant'))-normal*0.7)<1e-9,'carry slowdown');
+lot.defenses.sprinkler=true;
+assert.ok(Math.abs(distance(move(1,0,'plant'))-normal*0.7*0.6)<1e-9,'hostile sprinkler slowdown');
+assert.equal(distance(move(1,0)),normal,'sprinklers only slow carriers');
+lot.defenses.mud=true;
+assert.ok(Math.abs(distance(move(1,0))-normal*0.6)<1e-9,'hostile mud slowdown');
+lot.ownerId='me';
+assert.equal(distance(move(1,0)),normal,'owner is immune to their mud');
+assert.equal(distance(move(1,0,null,4)),normal,'background frame gaps cannot teleport a player');
+assert.equal(distance(move(0,0)),0);
+const wall={x:60*TILE,y:40*TILE};
+village.grid[40*120+61]=T.hedge;
+const againstWall={x:61*TILE-6,y:wall.y+16};
+const blocked=predictMovement(village,againstWall,{x:1,y:0},0.05,0,null,'me',[],()=>false);
+assert.ok(blocked.x<61*TILE,'collision must not cross hedge');
+console.log('ALL 10 movement checks PASS');

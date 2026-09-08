@@ -1,20 +1,22 @@
 // Share-page snapshot renderer (bible §6.4). Pure-JS PNG compositing from the same sprite atlases the client uses,
-// so /garden/<address> looks exactly like the game. No native deps (pngjs only).
+// A top-down illustration sharing the game's assets, not an HD-2D screenshot.
+// No native deps (pngjs only).
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import type { GardenSpec } from '../shared/derive/types';
 import { T, LOT_W, LOT_H, TILE, TILE_STRIDE } from '../shared/world';
+import { QUIET_GRASS_PATCHES } from '../shared/ground-style';
 
 interface Atlas { png: PNG; frames: Record<string, { frame: { x: number; y: number; w: number; h: number } }> }
 const cache = new Map<string, Atlas | PNG>();
 
 function loadPng(dir: string, name: string): PNG {
-  const k = `png:${name}`; if (cache.has(k)) return cache.get(k) as PNG;
+  const k = `png:${path.resolve(dir)}:${name}`; if (cache.has(k)) return cache.get(k) as PNG;
   const p = PNG.sync.read(fs.readFileSync(path.join(dir, `${name}.png`))); cache.set(k, p); return p;
 }
 function loadAtlas(dir: string, name: string): Atlas {
-  const k = `atlas:${name}`; if (cache.has(k)) return cache.get(k) as Atlas;
+  const k = `atlas:${path.resolve(dir)}:${name}`; if (cache.has(k)) return cache.get(k) as Atlas;
   const a = { png: loadPng(dir, name), frames: JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8')).frames }; cache.set(k, a); return a;
 }
 function blit(dst: PNG, src: PNG, sx: number, sy: number, w: number, h: number, dx: number, dy: number, scale: number, flipY = false): void {
@@ -39,8 +41,20 @@ function plotSlots(): { tx: number; ty: number }[] {
 export function renderLot(spriteDir: string, lot: ShareLot, scale = 2): Buffer {
   const { spec } = lot; const W = (LOT_W + 4) * TILE; const H = (LOT_H + 4) * TILE;
   const out = new PNG({ width: W * scale, height: H * scale });
-  const tiles = loadPng(spriteDir, `tiles_b${spec.biome}`); const plants = loadAtlas(spriteDir, 'plants'); const props = loadAtlas(spriteDir, 'props'); const plaza = loadAtlas(spriteDir, 'plaza');
-  const tile = (idx: number, tx: number, ty: number) => blit(out, tiles, (idx % TILE_STRIDE) * TILE, Math.floor(idx / TILE_STRIDE) * TILE, TILE, TILE, tx * TILE * scale, ty * TILE * scale, scale);
+  const tiles = loadPng(spriteDir, 'tiles_b0'); const plants = loadAtlas(spriteDir, 'plants'); const props = loadAtlas(spriteDir, 'props'); const plaza = loadAtlas(spriteDir, 'plaza');
+  const grasses = new Set([T.grass, T.grass2, T.grass3, T.flowers]);
+  const tile = (idx: number, tx: number, ty: number) => {
+    if (!grasses.has(idx)) {
+      blit(out, tiles, (idx % TILE_STRIDE) * TILE, Math.floor(idx / TILE_STRIDE) * TILE, TILE, TILE, tx * TILE * scale, ty * TILE * scale, scale); return;
+    }
+    for (const patch of QUIET_GRASS_PATCHES) {
+      for (let y = 0; y < patch.height * scale; y++) for (let x = 0; x < patch.width * scale; x++) {
+        const i = (((ty * TILE + patch.y) * scale + y) * out.width + (tx * TILE + patch.x) * scale + x) * 4;
+        out.data[i] = patch.color >> 16; out.data[i + 1] = (patch.color >> 8) & 255;
+        out.data[i + 2] = patch.color & 255; out.data[i + 3] = 255;
+      }
+    }
+  };
   const frame = (a: Atlas, name: string, x: number, y: number, flipY = false) => { const f = a.frames[name]; if (f) blit(out, a.png, f.frame.x, f.frame.y, f.frame.w, f.frame.h, x * scale, y * scale, scale, flipY); };
   // ground + lot
   for (let ty = 0; ty < LOT_H + 4; ty++) for (let tx = 0; tx < LOT_W + 4; tx++) tile((tx * 7 + ty * 3) % 5 === 0 ? T.grass2 : T.grass, tx, ty);
