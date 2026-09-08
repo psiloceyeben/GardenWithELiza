@@ -123,6 +123,57 @@ These are in addition to the eight in the counsel packet.
    the same holdings, producing no Sap, acceptable? That version is already built and
    shipping today.
 
+## 5a. Later variants proposed by Benjamin, 2026-09-08
+
+As the discussion progressed, Benjamin narrowed the design twice. Both narrowed versions
+are recorded here because each removes real exposure and counsel should be able to rule
+on them separately rather than on the original alone.
+
+### Variant D — Pot funded by the treasury; staking restricted to the project token
+
+Removes elements 1, 2, 4 and 6 from the table in section 4. Entry to the season is free,
+players contribute nothing to the pot, and the pot is funded from the studio's own fee
+revenue. No SOL or BTC is accepted and nothing is converted. Players stake only the
+project token, into a dedicated operator-controlled wallet, and receive token rewards
+over time.
+
+Remaining exposure: **element 3** (the operator holds staked player assets, engaging
+custody and money-transmission or VASP analysis) and **element 5** (paying token holders
+more of the token for locking it up, engaging the investment-contract analysis).
+
+### Variant E — No custody at all; airdrops determined by time held
+
+Benjamin's final narrowing. The game takes no deposit and holds nothing. It **reads** a
+public wallet balance over time and distributes token airdrops from the development
+supply in proportion to how long the balance was held.
+
+Removes element 3 entirely, which is a genuine improvement: with no lock-up and no
+operator-held assets there is no custody and no transmission.
+
+Remaining exposure: **element 5 survives intact.** The economics are unchanged from a
+staking-rewards programme with the lock-up removed. Purchasers acquire the token, the
+operator distributes additional tokens to them on the strength of holding, the
+distribution is funded and executed by the operator, and holders' expectation of it is a
+reason to buy and hold. Two further points counsel should weigh:
+
+1. **Free distribution is not a safe harbour.** In *In re Tomahawk Exploration LLC* the
+   Commission found a token bounty programme to be an offer and sale of securities even
+   though recipients paid nothing, on the basis that the issuer received value in the
+   form of promotion and market interest.
+2. **The exposure is not confined to the game.** A recurring, operator-funded
+   distribution conditioned on holding, and promoted as a reason to hold, materially
+   strengthens the argument that the **project token itself** is an investment contract.
+   That reaches the token, its listing and everything downstream, not just one game
+   feature. Engineering regards this as the most consequential risk raised in this
+   document.
+
+**Question 8, specific to Variant E.** Does an operator-funded distribution to holders,
+sized by holding duration and with no lock-up, constitute an offering of securities in
+the project token, and does it strengthen the case that the token is itself an investment
+contract? If so, is the shipping alternative sufficient: read the same wallet, distribute
+nothing, and pay entirely in game content — plots, rarity floor, hybrid species and the
+conviction tree?
+
 ## 6. Engineering position, recorded for the file
 
 The engineering side has declined to implement any part of this design pending counsel's
