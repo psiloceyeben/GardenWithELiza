@@ -18,7 +18,7 @@ import * as Oracle from './oracle';
 import { NPCS, MISSIONS, MISSION_MAX_ACTIVE, npcById, type MissionKind, type MissionView } from '../../shared/missions';
 import { ROSTER } from './roster';
 import { LEGACY_SPECIES } from '../../shared/roster';
-import { currentProfile, recordSteal, recordTag, recordMission, runBell, writeLedgerRow, dueBellSeason } from './season';
+import { currentProfile, recordSteal, recordTag, recordMission, setSprintRecord, runBell, writeLedgerRow, dueBellSeason } from './season';
 import { seasonEnd } from '../../shared/season';
 import copyJson from '../../content/copy.json';
 
@@ -821,10 +821,19 @@ export class Game {
     const entrants = [...this.players.values()];
     if (!entrants.length) return;
 
+    // Sprint record holder at the bell. The board stores names rather than ids, so this
+    // matches on name; if two players share one, both would be credited. Acceptable for
+    // a 50-point component, and it goes away when the board carries ids.
+    let recordName: string | null = null;
+    let best = Infinity;
+    for (const v of this.villages.values()) {
+      for (const e of v.sprint ?? []) if (e.ms < best) { best = e.ms; recordName = e.name; }
+    }
+
     const result = runBell(
       entrants.map((r) => ({
         id: r.id, name: r.name, plots: r.plots,
-        profile: currentProfile(r.profile, bellAt),
+        profile: setSprintRecord(currentProfile(r.profile, bellAt), r.name === recordName),
         // D-2: both stay 0 until the chain reader is live, so nobody is prize-eligible
         // yet. Standings and settlement still run; only the payout list is empty.
         ponsGarden: 0, pons: 0,

@@ -8,9 +8,10 @@ passes, because Season 1 opens in hours and you need to know what is actually ru
 
 ## Verdict
 
-**The game is live, healthy and playable, the market larp works, and the season is wired.**
-Four defects were found and fixed, two of which would have been visible to players. Two
-scoring components remain unwired against a published rule — see D-1.
+**The game is live, healthy and playable, the market larp works, and the season is wired
+and scoring.** Four defects were found and fixed; two of them would have been visible to
+players, and one made the game unplayable on the build that had just gone live. The
+published rules and the code now agree exactly.
 
 | Check | Result |
 |---|---|
@@ -85,9 +86,9 @@ The last-settled marker is the **max** across players, so a newcomer whose profi
 at 0 cannot re-trigger seasons that already closed; `applySettlement` idempotency is the
 backstop if it ever did.
 
-**Still not wired:** defences held and the sprint record. Both are scoring components in
-the published rules, so either wire them before the bell or amend the rules page. This is
-the one remaining inconsistency between what the rules promise and what the code counts.
+**Resolved since:** the sprint record is now computed at the bell from the village board.
+"Defences held" needed a real mechanic rather than a rushed one, so it was removed from
+the published rules instead. Rules and code now agree exactly.
 
 ### D-2 — Chain eligibility reads nothing *(blocked on you)*
 `isPrizeEligible` is implemented and tested, but `BellPlayer.ponsGarden` and `.pons` are
@@ -136,10 +137,10 @@ Two other players were online during the audit, and the deploy did not disrupt t
 
 ## Recommendation
 
-D-1 is fixed and deployed. Of what remains, only the two unwired scoring components
-(defences held, sprint record) contradict a published rule; everything else is blocked on
-you (D-2, D-4), cosmetic (D-5, D-6), or additive content that can land during the season
-(D-3).
+D-1 is fixed and deployed, and the two scoring gaps it exposed
+are resolved: sprint record is wired, and "defences held" was removed from the rules rather
+than shipped half-built. Rules and code agree. What remains is blocked on you (D-2, D-4),
+cosmetic (D-5, D-6), or additive content that can land during the season (D-3).
 
 **Season 1 can open on schedule.** It will score steals, tags, missions and book value,
 settle correctly at the bell, and write a ledger row. Nobody will be prize-eligible until
