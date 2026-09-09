@@ -66,6 +66,13 @@
   .cta:hover{transform:translate(2px,2px);box-shadow:4px 4px 0 var(--brown2)}
   .cta-sub{display:block;margin-top:14px;color:var(--dim);font-size:12px}
   .eliza-sub{margin-top:6px;color:var(--brown);letter-spacing:.5px}
+  /* Top banner: the wordmark over a row of the game's own plants, drawn from the atlas. */
+  .banner{margin:0 auto 26px}
+  .banner-title{font-size:clamp(20px,3.6vw,34px);color:var(--ink);letter-spacing:1px;margin-bottom:22px}
+  .banner-row{display:flex;justify-content:center;align-items:flex-end;gap:clamp(4px,1.6vw,20px);flex-wrap:wrap}
+  .banner-row i{display:block;width:48px;height:72px;background-image:url(/sprites/plants.png);
+    background-repeat:no-repeat;background-size:624px 2160px;image-rendering:pixelated}
+  @media (max-width:600px){.banner-row i{width:36px;height:54px;background-size:468px 1620px}}
   .badge{display:inline-flex;align-items:center;gap:7px;color:var(--brown);font-size:12px;margin-bottom:18px}
   .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 1.6s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
@@ -163,6 +170,10 @@
 
 <!-- ============================ HERO ============================ -->
 <div class="hero"><div class="wrap">
+  <div class="banner">
+    <div class="banner-title">🌱 Garden With Eliza</div>
+    <div class="banner-row" id="bannerRow"></div>
+  </div>
   <div class="badge"><span class="dot"></span> SEASON 1 IS RUNNING</div>
   <h1>Your land stays yours.<br><em>Your plants do not.</em></h1>
   <p class="hero-eliza"><a href="#eliza">Garden with ELIZA</a></p>
@@ -533,6 +544,31 @@ export const character = {
   document.getElementById('prevLook')?.addEventListener('click', () => step(-1));
   document.getElementById('nextLook')?.addEventListener('click', () => step(1));
   paintMe();
+
+  // ---- top banner ------------------------------------------------------------------
+  // A parade of the game's own plants, drawn straight from the atlas. Indices are chosen
+  // for silhouette variety (bush, cactus, radish, corn, carrot, pumpkin, sunflower,
+  // mushroom, flytrap, bamboo, pineapple) rather than by tier. Idle frames start at
+  // column 5; drawn at 1.5x, so the atlas is scaled to 1248x4320 and a step is 48px.
+  const BANNER = [13, 7, 4, 6, 10, 11, 12, 15, 27, 22, 18];
+  const bannerRow = document.getElementById('bannerRow');
+  if (bannerRow) {
+    bannerRow.innerHTML = BANNER.map((i) => `<i data-row="${i}"></i>`).join('');
+    const small = matchMedia('(max-width:600px)');
+    let bf = 0;
+    const paintBanner = () => {
+      const step = small.matches ? 36 : 48;
+      const rowH = small.matches ? 54 : 72;
+      const x = -(5 + bf) * step;
+      for (const el of bannerRow.children) {
+        el.style.backgroundPosition = `${x}px ${-el.dataset.row * rowH}px`;
+      }
+    };
+    paintBanner();
+    // Stagger is deliberate: a row breathing in perfect unison looks mechanical.
+    setInterval(() => { bf = (bf + 1) % 6; paintBanner(); }, 200);
+    small.addEventListener('change', paintBanner);
+  }
   paint(); setInterval(paint, 5000);
 </script>
 </body>

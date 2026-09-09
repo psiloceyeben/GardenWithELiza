@@ -16,11 +16,11 @@
     button:active { transform:translate(1px,1px); box-shadow:1px 1px 0 #000; }
     button:disabled { opacity:.45; cursor:default; }
     input { font-family:inherit; font-size:9px; color:var(--text); background:#120c18; border:2px solid var(--edge); padding:7px 8px; outline:none; }
-    #hud { position:fixed; top:calc(var(--tape-h, 44px) + 10px); left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:7px 9px; line-height:1.8; pointer-events:none; max-width:46vw; }
+    #hud { position:fixed; top:64px; left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:7px 9px; line-height:1.8; pointer-events:none; max-width:46vw; }
     #hud .sap { color:var(--sap); }
     #hud .dim { color:var(--dim); font-size:7px; }
     #carry { color:#ff8080; font-size:7px; }
-    #feed { position:fixed; top:calc(var(--tape-h, 44px) + 10px); right:8px; width:min(44vw,300px); pointer-events:none; font-size:7px; line-height:1.6; }
+    #feed { position:fixed; top:64px; right:8px; width:min(44vw,300px); pointer-events:none; font-size:7px; line-height:1.6; }
     .fe { background:rgba(24,18,32,.85); border-left:3px solid var(--edge); padding:4px 6px; margin-bottom:3px; }
     .fe-steal { border-color:#ff5555; } .fe-tag { border-color:#6cd46c; } .fe-gate, .fe-break { border-color:var(--sap); } .fe-reveal { border-color:#c26bff; } .fe-join { border-color:#8fc3ff; }
     #chatlog { position:fixed; left:8px; bottom:calc(58px + env(safe-area-inset-bottom)); font-size:7px; line-height:1.7; pointer-events:none; max-width:60vw; }
@@ -63,7 +63,7 @@
     #toast.on { opacity:1; }
     /* Natural-height rows prevent feed/event/notice collisions at every width,
        including desktop feeds that grow to several wrapped entries. */
-    #status-stack { position:fixed; top:calc(8px + env(safe-area-inset-top)); left:8px; right:8px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; pointer-events:none; z-index:6; }
+    #status-stack { position:fixed; top:calc(64px + env(safe-area-inset-top));   /* clears the two-row ticker; #hud is position:static inside this grid, so the offset MUST live here */ left:8px; right:8px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; pointer-events:none; z-index:6; }
     #status-stack > #hud, #status-stack > #feed, #status-stack > #banner, #status-stack > #toast { position:static; transform:none; min-width:0; max-width:100%; overflow-wrap:anywhere; }
     #status-stack > #hud { align-self:start; justify-self:start; width:fit-content; }
     #status-stack > #feed { align-self:start; justify-self:end; width:min(100%,300px); }
