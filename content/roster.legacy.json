@@ -1,0 +1,33 @@
+{
+  "_doc": "Pons Garden flora roster. Original IP only (I-9). Every name must pass the 'someone stole my ___' test. status=exemplar comes from the bible; status=candidate is harness-generated for Benjamin to curate (D-5). sapBase per §3.1.",
+  "species": [
+    { "id": "gorbulon_sprig", "name": "Gorbulon Sprig", "tier": "common", "silhouette": "smug bean sprout with one enormous eyebrow", "idle": "raises it", "flavor": "It knows something. It will not say what.", "sapBase": 1, "status": "exemplar" },
+    { "id": "plain_gerald", "name": "Plain Gerald", "tier": "common", "silhouette": "an onion bulb with a single hair", "idle": "blinks slowly", "flavor": "Gerald is doing his best.", "sapBase": 1, "status": "candidate" },
+    { "id": "bogwort", "name": "Bogwort", "tier": "common", "silhouette": "a pea pod that is visibly damp", "idle": "shivers", "flavor": "Found in a bog. Wants to go back.", "sapBase": 1, "status": "candidate" },
+    { "id": "concerned_radish", "name": "Mildly Concerned Radish", "tier": "common", "silhouette": "round red radish, brow furrowed", "idle": "sweats one drop", "flavor": "Everything is probably fine.", "sapBase": 1, "status": "candidate" },
+
+    { "id": "weeping_wumbus", "name": "Weeping Wumbus", "tier": "uncommon", "silhouette": "melon that cries Sap tears into its own pot", "idle": "sniffles", "flavor": "The tears are Sap. Please do not ask why.", "sapBase": 3, "status": "exemplar" },
+    { "id": "clammy_pete", "name": "Clammy Pete", "tier": "uncommon", "silhouette": "a short cactus with a nervous smile", "idle": "sweats", "flavor": "Pete would like a hug and cannot have one.", "sapBase": 3, "status": "candidate" },
+    { "id": "low_ambition_tulip", "name": "Tulip of Low Ambition", "tier": "uncommon", "silhouette": "a tulip leaning slightly away from the sun", "idle": "nods off", "flavor": "It has plans. Tomorrow, maybe.", "sapBase": 3, "status": "candidate" },
+    { "id": "corn_that_knows", "name": "The Corn That Knows", "tier": "uncommon", "silhouette": "an ear of corn with narrowed eyes", "idle": "side-eyes the player", "flavor": "It has seen your browser history.", "sapBase": 3, "status": "candidate" },
+
+    { "id": "unlicensed_carrot", "name": "The Unlicensed Carrot", "tier": "rare", "silhouette": "carrot in a tiny suit holding a briefcase that won't open", "idle": "checks watch", "flavor": "Not a lawyer. Has never claimed to be a lawyer.", "sapBase": 9, "status": "exemplar" },
+    { "id": "pumpkin_esquire", "name": "Pumpkin, Esquire", "tier": "rare", "silhouette": "a pumpkin with a monocle and no explanation", "idle": "adjusts monocle", "flavor": "Will be addressed correctly or not at all.", "sapBase": 9, "status": "candidate" },
+    { "id": "bartholomew_bean", "name": "Bartholomew Bean", "tier": "rare", "silhouette": "a berry bush that insists it is a bean", "idle": "shakes berries", "flavor": "The berries are, legally, beans.", "sapBase": 9, "status": "candidate" },
+    { "id": "sunflower_who_lied", "name": "The Sunflower Who Lied", "tier": "rare", "silhouette": "a sunflower facing firmly away from the sun", "idle": "glances back", "flavor": "It said it was facing the sun. It was not.", "sapBase": 9, "status": "candidate" },
+
+    { "id": "sir_blombus", "name": "Sir Blombus of the Damp", "tier": "epic", "silhouette": "knighted mushroom, visibly moist, tiny sword", "idle": "knights nearby Commons", "flavor": "Sworn to protect the plot. Slightly wet.", "sapBase": 27, "status": "exemplar" },
+    { "id": "duchess_turnip", "name": "Duchess Turnip the Third", "tier": "epic", "silhouette": "a turnip wearing the smallest crown", "idle": "waves slowly", "flavor": "The first two Duchesses are not discussed.", "sapBase": 27, "status": "candidate" },
+    { "id": "grabby_bertrand", "name": "Grabby Bertrand", "tier": "epic", "silhouette": "a flytrap with a gap-toothed grin", "idle": "snaps at nothing", "flavor": "Bertrand does not bite. Bertrand grabs.", "sapBase": 27, "status": "candidate" },
+    { "id": "pineapple_enforcer", "name": "The Pineapple Enforcer", "tier": "epic", "silhouette": "a pineapple with folded leaf-arms", "idle": "cracks knuckles", "flavor": "Nobody steals on the Enforcer's watch. Somebody will try.", "sapBase": 27, "status": "candidate" },
+
+    { "id": "fraudulent_orchid", "name": "Fraudulent Orchid", "tier": "legendary", "silhouette": "obviously two ferns in a trench coat", "idle": "coat slips", "flavor": "It is one orchid. Do not look at the coat.", "sapBase": 81, "status": "exemplar" },
+    { "id": "lord_eggplant", "name": "Lord Eggplant Ascendant", "tier": "legendary", "silhouette": "an eggplant floating one pixel above its plot", "idle": "hovers", "flavor": "Has transcended soil. Still needs watering.", "sapBase": 81, "status": "candidate" },
+    { "id": "bamboo_inspector", "name": "The Bamboo Inspector", "tier": "legendary", "silhouette": "three bamboo stalks with a clipboard", "idle": "writes something down", "flavor": "Your garden has been noted.", "sapBase": 81, "status": "candidate" },
+
+    { "id": "yelling_tuber", "name": "YELLING TUBER", "tier": "mythic", "silhouette": "potato. It yells. That's it.", "idle": "inhales", "flavor": "AAAAAAAAAAAAAAAAAAAAAAAAA.", "sapBase": 243, "status": "exemplar" },
+
+    { "id": "melonhound", "name": "The Melonhound", "tier": "rare", "silhouette": "a melon that is also, somehow, a dog", "idle": "pants", "flavor": "Good melon. Good boy. Both.", "sapBase": 9, "status": "candidate", "hybrid": true },
+    { "id": "cactusberry_vicar", "name": "Cactusberry Vicar", "tier": "epic", "silhouette": "a purple cactus with berries and opinions", "idle": "clears throat", "flavor": "Will bless your plot whether you asked or not.", "sapBase": 27, "status": "candidate", "hybrid": true }
+  ]
+}

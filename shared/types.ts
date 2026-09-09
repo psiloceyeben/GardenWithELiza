@@ -1,10 +1,13 @@
 // Shared types. Layer G (game state) for M1; Layer C (GardenSpec) arrives in M2 via derive/.
 export type Tier = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+export type Sector = 'shells' | 'growth' | 'retail' | 'staples' | 'financials' | 'energy' | 'semis' | 'biotech' | 'adtech' | 'funds';
 export type MutationId = 'none' | 'golden' | 'holographic' | 'colossal' | 'feral' | 'backwards' | 'screaming';
 
 export interface Species {
   id: string;
   name: string;
+  ticker: string;
+  sector: Sector;
   tier: Tier;
   silhouette: string;
   idle: string;

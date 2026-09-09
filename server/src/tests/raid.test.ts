@@ -8,8 +8,8 @@ import { Game } from '../game';
 import { SHOP_PRICES, LOCK_MS, STEAL_CAP_PER_HOUR, BOUNTY_MIN, BOUNTY_SEC, BASE_SPEED, MUD_SPEED, CARRY_SPEED, SPRINKLER_SPEED } from '../../../shared/protocol';
 import { sapPerSec } from '../../../shared/economy';
 import type { Plant, Species } from '../../../shared/types';
-import roster from '../../../content/roster.json';
-const tagPayment = (plant: Plant) => Math.max(BOUNTY_MIN, Math.floor(sapPerSec(plant, roster.species.find(s => s.id === plant.speciesId)! as Species) * BOUNTY_SEC));
+import { ROSTER } from '../roster';
+const tagPayment = (plant: Plant) => Math.max(BOUNTY_MIN, Math.floor(sapPerSec(plant, ROSTER.find(s => s.id === plant.speciesId)! as Species) * BOUNTY_SEC));
 import { TILE, lotGatePx } from '../../../shared/world';
 async function setup() {
   const directory = mkdtempSync(join(tmpdir(), 'pons-raid-test-'));
@@ -19,7 +19,7 @@ async function setup() {
   const thief = game.join(socket(), { t: 'hello', id: 'raidthief001', secret: 'thief-secret', name: 'Thief' })!;
   const rec = game.players.get(owner.id)!, attacker = game.players.get(thief.id)!; const now = Date.now();
   owner.shieldUntil = 0; thief.shieldUntil = 0; rec.sap = 2000;
-  rec.plots[0] = { uid: 'original', speciesId: 'gorbulon_sprig', tier: 'common', plantedAt: now - 60000, growMs: 30000,
+  rec.plots[0] = { uid: 'original', speciesId: 'husk_holdings', tier: 'common', plantedAt: now - 60000, growMs: 30000,
     revealed: true, size: 1, mutation: 'none', watered: false, lastWeeded: now };
   const plot = game.lot(rec).plots[0]; thief.x = plot.tx * TILE + 16; thief.y = plot.ty * TILE + 16;
   game.store.touch(); return { game, owner, thief, rec, attacker, now, directory };

@@ -13,7 +13,7 @@ async function setup(){
   const b=game.join(socket(),{t:'hello',id:'forageplayer002',secret:'forage-secret-b',name:'Forager B'})!;
   const ar=game.players.get(a.id)!,br=game.players.get(b.id)!;
   a.x=b.x=200;a.y=b.y=200;
-  const wild={id:'wild-fixture',x:200,y:200,speciesId:'gorbulon_sprig',tier:'common' as const,until:Date.now()+60000};
+  const wild={id:'wild-fixture',x:200,y:200,speciesId:'husk_holdings',tier:'common' as const,until:Date.now()+60000};
   game.life.wild.set(ar.villageId,[wild]);return {game,directory,a,b,ar,br,wild};
 }
 test('competing forage intents and replay award exactly one persisted seed',async()=>{

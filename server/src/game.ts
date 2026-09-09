@@ -16,10 +16,9 @@ import { signMessage } from '../../shared/chain';
 import { Life } from './life';
 import * as Oracle from './oracle';
 import { NPCS, MISSIONS, MISSION_MAX_ACTIVE, npcById, type MissionKind, type MissionView } from '../../shared/missions';
-import rosterJson from '../../content/roster.json';
+import { ROSTER } from './roster';
 import copyJson from '../../content/copy.json';
 
-const ROSTER = rosterJson.species as import('../../shared/types').Species[];
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
 const MUT = copyJson.mutations as Record<string, string>;
 const UI = copyJson.ui as Record<string, string>;

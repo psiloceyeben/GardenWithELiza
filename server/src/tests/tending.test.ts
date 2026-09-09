@@ -12,7 +12,7 @@ async function setup(){
   const live=game.join(ws,{t:'hello',id:'tendingplayer001',secret:'tending-secret',name:'Gardener'})!;
   const rec=game.players.get(live.id)!,plot=game.lot(rec).plots[0];
   live.x=plot.tx*32+16;live.y=plot.ty*32+16;
-  rec.seeds=[{uid:'tend-seed',speciesId:'gorbulon_sprig',tier:'common'}];
+  rec.seeds=[{uid:'tend-seed',speciesId:'husk_holdings',tier:'common'}];
   return {directory,game,live,rec};
 }
 for(const reason of ['distance','village','invalid-index'] as const)test('planting and tending reject '+reason+' without mutation',async()=>{
@@ -25,7 +25,7 @@ for(const reason of ['distance','village','invalid-index'] as const)test('planti
     game.onPlant(live,rec,'tend-seed',plotId,Date.now());
     assert.equal(JSON.stringify(rec.seeds),seeds);assert.equal(rec.plots[0],null);
     for(const revealed of [false,true]){
-      rec.plots[0]={uid:'p-test',speciesId:'gorbulon_sprig',tier:'common',plantedAt:Date.now(),growMs:30000,revealed,size:1,mutation:'none',watered:false,lastWeeded:0};
+      rec.plots[0]={uid:'p-test',speciesId:'husk_holdings',tier:'common',plantedAt:Date.now(),growMs:30000,revealed,size:1,mutation:'none',watered:false,lastWeeded:0};
       const before=JSON.stringify(rec.plots),sap=rec.sap;
       game.onTend(live,rec,plotId,Date.now());
       assert.equal(JSON.stringify(rec.plots),before);assert.equal(rec.sap,sap);

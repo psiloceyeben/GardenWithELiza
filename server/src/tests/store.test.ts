@@ -54,7 +54,7 @@ async function gameChecks():Promise<void> {
   const now=Date.now();
   const owner=game.newPlayer('owner','secret','Owner',null,now);
   const thief=game.newPlayer('thief','secret','Thief',null,now);
-  const plant:Plant={uid:'recover-me',speciesId:'gorbulon_sprig',tier:'common',plantedAt:now-60000,growMs:30000,revealed:true,size:1.2,mutation:'golden',watered:false,lastWeeded:now};
+  const plant:Plant={uid:'recover-me',speciesId:'husk_holdings',tier:'common',plantedAt:now-60000,growMs:30000,revealed:true,size:1.2,mutation:'golden',watered:false,lastWeeded:now};
   thief.carried={plant,from:owner.id,fromPlot:0};game.store.touch();
   await game.store.close(); // committed in-flight raid, as a crash would leave it
   const restart=new Game(dir);await restart.initialize();

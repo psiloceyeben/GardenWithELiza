@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { rollConveyor, rollStarterConveyor, STARTING_SAP, CONVEYOR_SLOTS } from '../../../shared/economy';
-import rosterJson from '../../../content/roster.json';
+import { ROSTER } from '../roster';
 import type { Species } from '../../../shared/types';
-const roster = rosterJson.species as Species[];
+const roster = ROSTER;
 test('even an all-mythic random roll leaves the first garden an affordable starter', () => {
   const slots = rollStarterConveyor(() => .9999, roster, 10);
   assert.equal(slots.length, CONVEYOR_SLOTS);

@@ -1,33 +1,128 @@
 {
-  "_doc": "Pons Garden flora roster. Original IP only (I-9). Every name must pass the 'someone stole my ___' test. status=exemplar comes from the bible; status=candidate is harness-generated for Benjamin to curate (D-5). sapBase per §3.1.",
+  "_doc": "Pons Garden flora roster. THIRTY LISTED COMPANIES, six tiers x five. Each entry has a stable neutral `id` (drawn from the SAFE name, so internal identity is permanently clean), a shared tier/sector/sapBase, and two display sets: `market` (the STOCKNAMEplant larp, ships by default) and `safe` (original IP). Only display strings differ between them - ids, tiers, sectors, sapBase and art keys are shared, which is what makes the flip one file with no migration. See PONS_GARDEN_BIBLE.md I-9 as amended 2026-09-08 and GAME_DESIGN.md s4a.",
+  "_flipPolicy": "On any cease-and-desist, platform complaint, processor query, or Benjamin's word: set PONS_ROSTER=safe and rebuild. No data migration is required or permitted, because no id, save record, art key or share URL contains a market name. A test asserts both sets resolve and that ids are identical across them.",
+  "_tiers": "common=Penny uncommon=SmallCap rare=MidCap epic=BlueChip legendary=Megacap mythic=Index",
+  "_sectors": ["shells", "growth", "retail", "staples", "financials", "energy", "semis", "biotech", "adtech", "funds"],
+
   "species": [
-    { "id": "gorbulon_sprig", "name": "Gorbulon Sprig", "tier": "common", "silhouette": "smug bean sprout with one enormous eyebrow", "idle": "raises it", "flavor": "It knows something. It will not say what.", "sapBase": 1, "status": "exemplar" },
-    { "id": "plain_gerald", "name": "Plain Gerald", "tier": "common", "silhouette": "an onion bulb with a single hair", "idle": "blinks slowly", "flavor": "Gerald is doing his best.", "sapBase": 1, "status": "candidate" },
-    { "id": "bogwort", "name": "Bogwort", "tier": "common", "silhouette": "a pea pod that is visibly damp", "idle": "shivers", "flavor": "Found in a bog. Wants to go back.", "sapBase": 1, "status": "candidate" },
-    { "id": "concerned_radish", "name": "Mildly Concerned Radish", "tier": "common", "silhouette": "round red radish, brow furrowed", "idle": "sweats one drop", "flavor": "Everything is probably fine.", "sapBase": 1, "status": "candidate" },
+    { "id": "husk_holdings", "tier": "common", "sector": "retail", "sapBase": 1, "status": "exemplar",
+      "market": { "name": "GAMESTOPplant", "ticker": "GME", "silhouette": "a hollow corn cob in a paper crown, sat in a cinema seat", "idle": "rattles", "flavor": "It refuses to be uprooted. It has refused for years." },
+      "safe":   { "name": "Husk Holdings", "ticker": "HUSK", "silhouette": "an ear of corn, completely hollow", "idle": "rattles", "flavor": "Nothing inside. Rattles when the wind blows." } },
 
-    { "id": "weeping_wumbus", "name": "Weeping Wumbus", "tier": "uncommon", "silhouette": "melon that cries Sap tears into its own pot", "idle": "sniffles", "flavor": "The tears are Sap. Please do not ask why.", "sapBase": 3, "status": "exemplar" },
-    { "id": "clammy_pete", "name": "Clammy Pete", "tier": "uncommon", "silhouette": "a short cactus with a nervous smile", "idle": "sweats", "flavor": "Pete would like a hug and cannot have one.", "sapBase": 3, "status": "candidate" },
-    { "id": "low_ambition_tulip", "name": "Tulip of Low Ambition", "tier": "uncommon", "silhouette": "a tulip leaning slightly away from the sun", "idle": "nods off", "flavor": "It has plans. Tomorrow, maybe.", "sapBase": 3, "status": "candidate" },
-    { "id": "corn_that_knows", "name": "The Corn That Knows", "tier": "uncommon", "silhouette": "an ear of corn with narrowed eyes", "idle": "side-eyes the player", "flavor": "It has seen your browser history.", "sapBase": 3, "status": "candidate" },
+    { "id": "rugg_capital", "tier": "common", "sector": "retail", "sapBase": 1, "status": "candidate",
+      "market": { "name": "AMCplant", "ticker": "AMC", "silhouette": "a popcorn-headed sprout holding a tiny ticket stub", "idle": "shushes you", "flavor": "The show is not over. The show is never over." },
+      "safe":   { "name": "Rugg Capital", "ticker": "RUGG", "silhouette": "a vine that pulls its own roots up", "idle": "pulls a root loose", "flavor": "It does this to itself. Nobody knows why." } },
 
-    { "id": "unlicensed_carrot", "name": "The Unlicensed Carrot", "tier": "rare", "silhouette": "carrot in a tiny suit holding a briefcase that won't open", "idle": "checks watch", "flavor": "Not a lawyer. Has never claimed to be a lawyer.", "sapBase": 9, "status": "exemplar" },
-    { "id": "pumpkin_esquire", "name": "Pumpkin, Esquire", "tier": "rare", "silhouette": "a pumpkin with a monocle and no explanation", "idle": "adjusts monocle", "flavor": "Will be addressed correctly or not at all.", "sapBase": 9, "status": "candidate" },
-    { "id": "bartholomew_bean", "name": "Bartholomew Bean", "tier": "rare", "silhouette": "a berry bush that insists it is a bean", "idle": "shakes berries", "flavor": "The berries are, legally, beans.", "sapBase": 9, "status": "candidate" },
-    { "id": "sunflower_who_lied", "name": "The Sunflower Who Lied", "tier": "rare", "silhouette": "a sunflower facing firmly away from the sun", "idle": "glances back", "flavor": "It said it was facing the sun. It was not.", "sapBase": 9, "status": "candidate" },
+    { "id": "moonwort", "tier": "common", "sector": "energy", "sapBase": 1, "status": "candidate",
+      "market": { "name": "NIKOLAplant", "ticker": "NKLA", "silhouette": "a sprout on a slight downhill slope, coasting", "idle": "rolls an inch", "flavor": "It is moving. Technically it is moving." },
+      "safe":   { "name": "Moonwort Ventures", "ticker": "MOON", "silhouette": "a seedling staring straight up", "idle": "points upward", "flavor": "Always about to. Has been about to for some time." } },
 
-    { "id": "sir_blombus", "name": "Sir Blombus of the Damp", "tier": "epic", "silhouette": "knighted mushroom, visibly moist, tiny sword", "idle": "knights nearby Commons", "flavor": "Sworn to protect the plot. Slightly wet.", "sapBase": 27, "status": "exemplar" },
-    { "id": "duchess_turnip", "name": "Duchess Turnip the Third", "tier": "epic", "silhouette": "a turnip wearing the smallest crown", "idle": "waves slowly", "flavor": "The first two Duchesses are not discussed.", "sapBase": 27, "status": "candidate" },
-    { "id": "grabby_bertrand", "name": "Grabby Bertrand", "tier": "epic", "silhouette": "a flytrap with a gap-toothed grin", "idle": "snaps at nothing", "flavor": "Bertrand does not bite. Bertrand grabs.", "sapBase": 27, "status": "candidate" },
-    { "id": "pineapple_enforcer", "name": "The Pineapple Enforcer", "tier": "epic", "silhouette": "a pineapple with folded leaf-arms", "idle": "cracks knuckles", "flavor": "Nobody steals on the Enforcer's watch. Somebody will try.", "sapBase": 27, "status": "candidate" },
+    { "id": "bagholly", "tier": "common", "sector": "shells", "sapBase": 1, "status": "candidate",
+      "market": { "name": "WEWORKplant", "ticker": "WE", "silhouette": "a sprout in an enormous empty pot it is subletting", "idle": "gestures at the space", "flavor": "There is room for six more. There has always been room." },
+      "safe":   { "name": "Bagholly & Co.", "ticker": "BAGZ", "silhouette": "a holly bush clutching a sack", "idle": "avoids eye contact", "flavor": "It is holding. It would like you to know it is holding." } },
 
-    { "id": "fraudulent_orchid", "name": "Fraudulent Orchid", "tier": "legendary", "silhouette": "obviously two ferns in a trench coat", "idle": "coat slips", "flavor": "It is one orchid. Do not look at the coat.", "sapBase": 81, "status": "exemplar" },
-    { "id": "lord_eggplant", "name": "Lord Eggplant Ascendant", "tier": "legendary", "silhouette": "an eggplant floating one pixel above its plot", "idle": "hovers", "flavor": "Has transcended soil. Still needs watering.", "sapBase": 81, "status": "candidate" },
-    { "id": "bamboo_inspector", "name": "The Bamboo Inspector", "tier": "legendary", "silhouette": "three bamboo stalks with a clipboard", "idle": "writes something down", "flavor": "Your garden has been noted.", "sapBase": 81, "status": "candidate" },
+    { "id": "pennysprout", "tier": "common", "sector": "growth", "sapBase": 1, "status": "candidate",
+      "market": { "name": "PELOTONplant", "ticker": "PTON", "silhouette": "a sprout pedalling furiously on a tiny wheel", "idle": "pedals", "flavor": "Enormous effort. Identical position." },
+      "safe":   { "name": "Pennysprout", "ticker": "PNNY", "silhouette": "a wide-eyed seedling holding a cardboard sign", "idle": "blinks hopefully", "flavor": "The sign is blank. It has not decided yet." } },
 
-    { "id": "yelling_tuber", "name": "YELLING TUBER", "tier": "mythic", "silhouette": "potato. It yells. That's it.", "idle": "inhales", "flavor": "AAAAAAAAAAAAAAAAAAAAAAAAA.", "sapBase": 243, "status": "exemplar" },
+    { "id": "fernance_brothers", "tier": "uncommon", "sector": "financials", "sapBase": 3, "status": "exemplar",
+      "market": { "name": "ROBINHOODplant", "ticker": "HOOD", "silhouette": "a fern in a small green feathered cap", "idle": "bows theatrically", "flavor": "Takes from the rich. Mostly, though, from you." },
+      "safe":   { "name": "Fernance Brothers", "ticker": "FRNC", "silhouette": "a fern with slicked-back fronds", "idle": "adjusts its collar", "flavor": "It will explain something to you now." } },
 
-    { "id": "melonhound", "name": "The Melonhound", "tier": "rare", "silhouette": "a melon that is also, somehow, a dog", "idle": "pants", "flavor": "Good melon. Good boy. Both.", "sapBase": 9, "status": "candidate", "hybrid": true },
-    { "id": "cactusberry_vicar", "name": "Cactusberry Vicar", "tier": "epic", "silhouette": "a purple cactus with berries and opinions", "idle": "clears throat", "flavor": "Will bless your plot whether you asked or not.", "sapBase": 27, "status": "candidate", "hybrid": true }
+    { "id": "panopticus_palm", "tier": "uncommon", "sector": "adtech", "sapBase": 3, "status": "candidate",
+      "market": { "name": "PALANTIRplant", "ticker": "PLTR", "silhouette": "a palm with a single dark eye in the trunk", "idle": "tracks the nearest player", "flavor": "It knows who took the thing. It is not saying." },
+      "safe":   { "name": "Panopticus Palm", "ticker": "PNPT", "silhouette": "a palm covered in small eyes", "idle": "blinks in sequence", "flavor": "Watches the whole village. Remembers all of it." } },
+
+    { "id": "voltvine", "tier": "uncommon", "sector": "energy", "sapBase": 3, "status": "candidate",
+      "market": { "name": "RIVIANplant", "ticker": "RIVN", "silhouette": "a vine with a tiny roof rack", "idle": "revs quietly", "flavor": "Ready. Very nearly ready." },
+      "safe":   { "name": "Voltvine", "ticker": "VOLT", "silhouette": "a vine with electric tendrils", "idle": "arcs to the fence", "flavor": "Do not touch it during a storm." } },
+
+    { "id": "ticker_tulip", "tier": "uncommon", "sector": "adtech", "sapBase": 3, "status": "candidate",
+      "market": { "name": "SNAPplant", "ticker": "SNAP", "silhouette": "a snapdragon that forgets", "idle": "snaps shut", "flavor": "It said something. It does not remember what." },
+      "safe":   { "name": "Ticker Tulip", "ticker": "TCKR", "silhouette": "a tulip whose petals scroll", "idle": "scrolls", "flavor": "Readable if you stand very still." } },
+
+    { "id": "sprout_and_sons", "tier": "uncommon", "sector": "retail", "sapBase": 3, "status": "candidate",
+      "market": { "name": "CHEWYplant", "ticker": "CHWY", "silhouette": "a friendly bush with an oversized bow", "idle": "wags", "flavor": "Delighted you came. Expensive about it." },
+      "safe":   { "name": "Sprout & Sons", "ticker": "SPRT", "silhouette": "a modest bush with a hand-painted sign", "idle": "straightens the sign", "flavor": "Family business. The sons are not involved." } },
+
+    { "id": "divvy_fig", "tier": "rare", "sector": "staples", "sapBase": 9, "status": "exemplar",
+      "market": { "name": "STARBUCKSplant", "ticker": "SBUX", "silhouette": "a fig tree steaming gently from every branch", "idle": "steams", "flavor": "It is on every corner of the plaza. All of them." },
+      "safe":   { "name": "Divvy Fig", "ticker": "DIVI", "silhouette": "a fig that drips one bead of syrup on a schedule", "idle": "drips, proudly", "flavor": "One bead. Every time. Very pleased about it." } },
+
+    { "id": "bullrush", "tier": "rare", "sector": "energy", "sapBase": 9, "status": "candidate",
+      "market": { "name": "FORDplant", "ticker": "F", "silhouette": "a sturdy reed with a chrome grille", "idle": "idles audibly", "flavor": "Older than the village. Still going." },
+      "safe":   { "name": "Bullrush", "ticker": "BULL", "silhouette": "a bulrush with its head down", "idle": "paws the soil", "flavor": "Charges its own fence. Every single time." } },
+
+    { "id": "everbloom", "tier": "rare", "sector": "biotech", "sapBase": 9, "status": "candidate",
+      "market": { "name": "PFIZERplant", "ticker": "PFE", "silhouette": "a blue flower shaped like a lozenge", "idle": "glows faintly", "flavor": "You feel better standing near it. That may be the point." },
+      "safe":   { "name": "Everbloom Pharma", "ticker": "EVBL", "silhouette": "a single perfect flower", "idle": "unfurls", "flavor": "One flower. Cures one thing. Charges accordingly." } },
+
+    { "id": "middling_mills", "tier": "rare", "sector": "staples", "sapBase": 9, "status": "candidate",
+      "market": { "name": "KROGERplant", "ticker": "KR", "silhouette": "a wheat stalk with a tiny shopping basket", "idle": "restocks itself", "flavor": "Everything, in bulk, slightly cheaper." },
+      "safe":   { "name": "Middling Mills", "ticker": "MIDL", "silhouette": "an entirely unremarkable wheat stalk", "idle": "sways", "flavor": "Has never missed a quarter. Has never had a good one." } },
+
+    { "id": "orchard_prime", "tier": "rare", "sector": "retail", "sapBase": 9, "status": "candidate",
+      "market": { "name": "UPSplant", "ticker": "UPS", "silhouette": "a brown-leaved shrub with a parcel wedged in it", "idle": "checks a clipboard", "flavor": "It was here. You were out." },
+      "safe":   { "name": "Orchard Prime", "ticker": "PRME", "silhouette": "a small tree mid-throw", "idle": "lobs a fruit", "flavor": "Delivers to your other plots. Uninvited." } },
+
+    { "id": "beargonia", "tier": "epic", "sector": "financials", "sapBase": 27, "status": "exemplar",
+      "market": { "name": "JPMORGANplant", "ticker": "JPM", "silhouette": "a begonia in a pinstriped pot", "idle": "checks a pocket watch", "flavor": "It has seen four crashes. It expects a fifth." },
+      "safe":   { "name": "Beargonia", "ticker": "BEAR", "silhouette": "a begonia with a grumpy bear's face", "idle": "sighs", "flavor": "Permanently disappointed. Occasionally correct." } },
+
+    { "id": "aunt_hazels", "tier": "epic", "sector": "staples", "sapBase": 27, "status": "candidate",
+      "market": { "name": "COCACOLAplant", "ticker": "KO", "silhouette": "a red-flowered vine that fizzes", "idle": "fizzes over", "flavor": "The recipe is in a vault. The vault is also a plant." },
+      "safe":   { "name": "Aunt Hazel's Preserves", "ticker": "HZEL", "silhouette": "a berry bush beside a row of jars", "idle": "seals a jar", "flavor": "Jam. Only jam. Since before the village." } },
+
+    { "id": "mahogany_board", "tier": "epic", "sector": "retail", "sapBase": 27, "status": "candidate",
+      "market": { "name": "DISNEYplant", "ticker": "DIS", "silhouette": "a tall tree with two perfectly round leaves near the top", "idle": "waves", "flavor": "Beloved. Litigious. Both at full strength." },
+      "safe":   { "name": "Mahogany Board", "ticker": "BORD", "silhouette": "a tree shaped like a boardroom table", "idle": "creaks, formally", "flavor": "Seats nine. Nobody knows who the ninth is." } },
+
+    { "id": "cornerstone_cactus", "tier": "epic", "sector": "staples", "sapBase": 27, "status": "candidate",
+      "market": { "name": "WALMARTplant", "ticker": "WMT", "silhouette": "an enormous low cactus with a yellow spark on top", "idle": "rolls back a price tag", "flavor": "Bigger than your garden. Costs less than your fence." },
+      "safe":   { "name": "Cornerstone Cactus", "ticker": "CNRS", "silhouette": "a squat, immovable cactus", "idle": "does not move", "flavor": "Has not moved since it was planted. Will not." } },
+
+    { "id": "custodian_cypress", "tier": "epic", "sector": "biotech", "sapBase": 27, "status": "candidate",
+      "market": { "name": "JOHNSONplant", "ticker": "JNJ", "silhouette": "a cypress with two identical trunks", "idle": "both trunks nod", "flavor": "Twice the trunk. Same tree." },
+      "safe":   { "name": "Custodian Cypress", "ticker": "CSTD", "silhouette": "a cypress in a tiny green visor", "idle": "adjusts the visor", "flavor": "Holds everyone else's things. Never its own." } },
+
+    { "id": "circuit_sequoia", "tier": "legendary", "sector": "semis", "sapBase": 81, "status": "exemplar",
+      "market": { "name": "NVIDIAplant", "ticker": "NVDA", "silhouette": "a towering sequoia veined with green light", "idle": "hums, rising in pitch", "flavor": "The hum gets louder before it spikes. Everyone has learned this." },
+      "safe":   { "name": "Circuit Sequoia", "ticker": "CRCT", "silhouette": "a sequoia veined with circuitry", "idle": "hums", "flavor": "The hum gets louder before it spikes." } },
+
+    { "id": "blue_chip_oak", "tier": "legendary", "sector": "semis", "sapBase": 81, "status": "candidate",
+      "market": { "name": "APPLEplant", "ticker": "AAPL", "silhouette": "an oak bearing one flawless fruit with a bite missing", "idle": "polishes the fruit", "flavor": "The bite was there when it grew. Nobody has explained this." },
+      "safe":   { "name": "Blue Chip Oak", "ticker": "OAKX", "silhouette": "an oak with blue chips for leaves", "idle": "clinks", "flavor": "The leaves clink in the wind. Reassuringly." } },
+
+    { "id": "trillion_thistle", "tier": "legendary", "sector": "energy", "sapBase": 81, "status": "candidate",
+      "market": { "name": "TESLAplant", "ticker": "TSLA", "silhouette": "a thistle throwing arcs of lightning between its spines", "idle": "arcs", "flavor": "Worth more than the rest of the row combined. Ask it why." },
+      "safe":   { "name": "Trillion Thistle", "ticker": "TRIL", "silhouette": "a thistle far too big for its pot", "idle": "overflows the pot", "flavor": "Too big for the pot. Entirely unbothered." } },
+
+    { "id": "orchard_giant", "tier": "legendary", "sector": "retail", "sapBase": 81, "status": "candidate",
+      "market": { "name": "AMAZONplant", "ticker": "AMZN", "silhouette": "a vast canopy raining small parcels", "idle": "drops a parcel", "flavor": "It has already delivered to plots you have not planted yet." },
+      "safe":   { "name": "The Orchard Giant", "ticker": "GIAN", "silhouette": "a canopy that covers four plots", "idle": "shades everything", "flavor": "Nothing grows beneath it. Nothing needs to." } },
+
+    { "id": "softwood", "tier": "legendary", "sector": "semis", "sapBase": 81, "status": "candidate",
+      "market": { "name": "MICROSOFTplant", "ticker": "MSFT", "silhouette": "a four-paned window flower on a pale trunk", "idle": "restarts itself", "flavor": "Dependable. Updates at the worst possible hour." },
+      "safe":   { "name": "Softwood Systems", "ticker": "SOFT", "silhouette": "a pale trunk with a four-paned flower", "idle": "reboots", "flavor": "Dependable. Updates at the worst possible hour." } },
+
+    { "id": "the_index", "tier": "mythic", "sector": "funds", "sapBase": 243, "status": "exemplar",
+      "market": { "name": "SP500plant", "ticker": "SPY", "silhouette": "a hedge made of five hundred smaller hedges", "idle": "all of it nods, slightly out of sync", "flavor": "You are not beating it. Nobody is beating it." },
+      "safe":   { "name": "The Index", "ticker": "NDEX", "silhouette": "a hedge made of smaller hedges", "idle": "nods out of sync", "flavor": "Every part of it disagrees. The whole is serene." } },
+
+    { "id": "steady_eddy", "tier": "mythic", "sector": "funds", "sapBase": 243, "status": "candidate",
+      "market": { "name": "VANGUARDplant", "ticker": "VOO", "silhouette": "an ancient, enormous, deeply boring tree", "idle": "does almost nothing", "flavor": "It will outlive your garden. And you. And the village." },
+      "safe":   { "name": "Steady Eddy Trust", "ticker": "TRST", "silhouette": "an ancient enormous tree", "idle": "does almost nothing", "flavor": "Boring. Enormous. Outlives everything around it." } },
+
+    { "id": "short_squeeze", "tier": "mythic", "sector": "funds", "sapBase": 243, "status": "candidate",
+      "market": { "name": "NASDAQplant", "ticker": "QQQ", "silhouette": "a coiled vine wound tight around a glowing post", "idle": "tightens", "flavor": "It goes up. Then it goes up more. Then, briefly, it does not." },
+      "safe":   { "name": "The Short Squeeze", "ticker": "SQZE", "silhouette": "a vine coiled dangerously tight", "idle": "tightens", "flavor": "Snaps once, spectacularly, and is spent." } },
+
+    { "id": "hedgeaway", "tier": "mythic", "sector": "funds", "sapBase": 243, "status": "candidate",
+      "market": { "name": "BERKSHIREplant", "ticker": "BRK", "silhouette": "an old hedge in reading glasses that owns the hedges around it", "idle": "turns a page", "flavor": "It bought the rest of this row a long time ago." },
+      "safe":   { "name": "The Hedgeaway", "ticker": "HEDG", "silhouette": "an old hedge in reading glasses", "idle": "turns a page", "flavor": "It owns the other hedges. They have not been told." } },
+
+    { "id": "reserve_bloom", "tier": "mythic", "sector": "funds", "sapBase": 243, "status": "candidate",
+      "market": { "name": "GOLDplant", "ticker": "GLD", "silhouette": "a goldenrod of actual soft gold", "idle": "gleams", "flavor": "Everyone remembers it exists at exactly the wrong moment." },
+      "safe":   { "name": "Goldenrod Reserve", "ticker": "GOLD", "silhouette": "a goldenrod of soft gold", "idle": "gleams", "flavor": "Dug up in panics. Reburied afterwards." } }
   ]
 }

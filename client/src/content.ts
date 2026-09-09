@@ -1,8 +1,8 @@
-import rosterJson from '@content/roster.json';
+import { resolveRoster } from '@shared/roster';
 import copyJson from '@content/copy.json';
 import type { Species, Tier, MutationId } from '@shared/types';
 
-export const ROSTER: Species[] = rosterJson.species as Species[];
+export const ROSTER: Species[] = resolveRoster(import.meta.env.VITE_PONS_ROSTER);
 const byId = new Map(ROSTER.map((s) => [s.id, s]));
 export const speciesById = (id: string): Species => {
   const s = byId.get(id);

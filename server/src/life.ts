@@ -6,10 +6,9 @@ import type { Wild, VillageEvent, EventKind, SprintEntry } from '../../shared/pr
 import * as E from '../../shared/economy';
 import { uid } from '../../shared/rng';
 import { isWalkableTile, lotAtPx, tileAt, T, TILE, VILLAGE_W, VILLAGE_H, type Village } from '../../shared/world';
-import rosterJson from '../../content/roster.json';
+import { ROSTER } from './roster';
 import copyJson from '../../content/copy.json';
 
-const ROSTER = rosterJson.species as import('../../shared/types').Species[];
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
 const UI = copyJson.ui as Record<string, string>;
 const EVENT_ORDER: EventKind[] = ['seed_rain', 'screaming_hour', 'golden_hour'];
