@@ -32,6 +32,15 @@ const CARDS = [
   { id: '03-the-village', shot: 'street',
     headline: 'Five keepers.<br>Ten missions.<br>One very loud potato.',
     sub: 'Meet the village, take a job, run a lap, lose a turnip.' },
+  { id: '04-the-board', shot: 'garden',
+    headline: 'Thirty companies.<br>All of them plants.<br>All of them stealable.',
+    sub: 'Penny stocks sprout in thirty seconds and swing wildly. An index takes a quarter of an hour and barely moves.' },
+  { id: '05-the-oracle', shot: 'street',
+    headline: 'The market has<br>an author.',
+    sub: 'Oracle7 reads the village and writes the moves. Semis rip. Rugg Capital halted after pulling its own roots up again.' },
+  { id: '06-the-bell', shot: 'town',
+    headline: 'Sunday.<br>The bell.<br>Everything settles.',
+    sub: 'Seven days, then every garden liquidates at whatever the market says in that exact second. Free to enter.' },
 ];
 
 const card = (c, w, h, dataUri) => `<!doctype html><meta charset="utf-8"><style>

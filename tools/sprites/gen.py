@@ -421,9 +421,33 @@ def mound(cv):
     cv.ellipse(16, 45, 9, 3, '4'); cv.ellipse(16, 45, 6, 1.5, '5')
 
 
+# The thirty-species board (2026-09-08) reuses the authored legacy drawings until the
+# dedicated art pass. Keyed new-id -> legacy-id; ids are stable, so swapping art later
+# touches only this map. Mirrors MODEL_ALIAS in client/src/three/plant-model.ts.
+VIS_ALIAS = {
+    'husk_holdings': 'gorbulon_sprig', 'moonwort': 'plain_gerald', 'bagholly': 'bogwort',
+    'pennysprout': 'concerned_radish', 'rugg_capital': 'gorbulon_sprig',
+    'fernance_brothers': 'weeping_wumbus', 'voltvine': 'clammy_pete',
+    'ticker_tulip': 'low_ambition_tulip', 'panopticus_palm': 'corn_that_knows',
+    'sprout_and_sons': 'bogwort',
+    'divvy_fig': 'unlicensed_carrot', 'bullrush': 'pumpkin_esquire',
+    'middling_mills': 'bartholomew_bean', 'everbloom': 'sunflower_who_lied',
+    'orchard_prime': 'melonhound',
+    'beargonia': 'sir_blombus', 'aunt_hazels': 'duchess_turnip',
+    'mahogany_board': 'grabby_bertrand', 'cornerstone_cactus': 'pineapple_enforcer',
+    'custodian_cypress': 'cactusberry_vicar',
+    'circuit_sequoia': 'fraudulent_orchid', 'blue_chip_oak': 'lord_eggplant',
+    'trillion_thistle': 'bamboo_inspector', 'orchard_giant': 'melonhound',
+    'softwood': 'sir_blombus',
+    'the_index': 'yelling_tuber', 'steady_eddy': 'bamboo_inspector',
+    'short_squeeze': 'grabby_bertrand', 'hedgeaway': 'bartholomew_bean',
+    'reserve_bloom': 'sunflower_who_lied',
+}
+
+
 def draw_plant(sid, stage, frame=0, wither=False):
     """stage 0..4 growth; stage 4 + frame = idle; wither draws the desaturated stump."""
-    V = VIS[sid]; cv = Canvas(32, 48)
+    V = VIS[VIS_ALIAS.get(sid, sid)]; cv = Canvas(32, 48)
     if stage == 0:
         mound(cv); cv.rect(15, 41, 2, 2, 'D'); return cv
     if stage == 1:
@@ -642,7 +666,7 @@ def main(out):
     plant_frames = []
     for sp in roster:
         sid = sp['id']
-        assert sid in VIS, f"no visuals for {sid}"
+        assert sid in VIS or sid in VIS_ALIAS, f"no visuals for {sid}"
         for st in range(5): plant_frames.append((f"{sid}_grow{st}", draw_plant(sid, st)))
         for fr in range(6): plant_frames.append((f"{sid}_idle{fr}", draw_plant(sid, 4, fr)))
         for fr in range(2): plant_frames.append((f"{sid}_wither{fr}", draw_plant(sid, 4, fr * 3, wither=True)))
