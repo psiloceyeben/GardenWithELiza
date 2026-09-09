@@ -6,7 +6,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { leadStory, briefQuestion, cleanHeadline, requestBrief, logBrief } from '../market-brief';
+import { leadStory, briefQuestion, cleanHeadline, requestBrief, logBrief, composeHeadline } from '../market-brief';
 import { MARKET_DISPLAY_PCT, sectorMovePct, TIER_VOLATILITY } from '../../../shared/market';
 import { SECTORS } from '../../../shared/roster';
 
@@ -67,7 +67,7 @@ test('the brief never carries overrides, so the model cannot move a yield', asyn
 test('briefs are logged with their inputs so a bell can be audited', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pons-brief-'));
   const digest = { season: 1, players: 2 };
-  logBrief(dir, { at: NOW, overrides: new Map(), headline: 'SEMIS rips +6.2%.', source: 'oracle' }, digest);
+  logBrief(dir, { at: NOW, overrides: new Map(), colour: 'Circuit Sequoia hums.', headline: 'SEMIS rips +6.2%.', source: 'oracle' }, digest);
   const lines = fs.readFileSync(path.join(dir, 'market-briefs.jsonl'), 'utf8').trim().split('\n');
   assert.equal(lines.length, 1);
   const row = JSON.parse(lines[0]);
@@ -79,5 +79,19 @@ test('briefs are logged with their inputs so a bell can be audited', () => {
 
 test('logging failures never propagate', () => {
   // A path that cannot be created must not take the game down.
-  assert.doesNotThrow(() => logBrief('\0invalid', { at: NOW, overrides: new Map(), headline: 'x'.repeat(20), source: 'fallback' }, { season: 1, players: 0 }));
+  assert.doesNotThrow(() => logBrief('\0invalid', { at: NOW, overrides: new Map(), colour: 'x'.repeat(20), headline: 'x'.repeat(20), source: 'fallback' }, { season: 1, players: 0 }));
+});
+
+test('the headline figure always matches the ticker beneath it', () => {
+  // A brief is up to five minutes old. The sector lead must be recomposed at broadcast
+  // time, or the tape reads "SHELLS gains +8%" directly above "SHELL -5.8%".
+  const brief = { at: NOW - 5 * 60_000, overrides: new Map(), colour: 'Quiet out there.', headline: 'stale', source: 'fallback' as const };
+  const later = NOW + 3 * 60_000;
+  const line = composeHeadline(brief, later);
+  const { sector, pct } = leadStory(later);
+  assert.ok(line.startsWith(sector.toUpperCase()), `headline led with the wrong sector: ${line}`);
+  assert.ok(line.includes(`${pct >= 0 ? '+' : ''}${pct}%`), `headline figure disagrees with the tape: ${line}`);
+  assert.ok(line.includes('Quiet out there.'), 'the Oracle sentence should survive recomposition');
+  // And it must actually change as the market moves.
+  assert.notEqual(composeHeadline(brief, later), composeHeadline(brief, later + 30 * 60_000));
 });

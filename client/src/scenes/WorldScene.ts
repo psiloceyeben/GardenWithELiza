@@ -179,6 +179,7 @@ export class WorldScene extends Phaser.Scene {
         this.ready = true; this.hud.refresh(); this.hud.feedRender();
         if (this.pendingWallet) { const w = this.pendingWallet; this.pendingWallet = null; void this.connectWallet(w); }
         this.hud.toast(`${COPY.village}: ${this.villageName}. ${COPY.controls}`, 6000);
+        if (!this.you?.land?.address) setTimeout(() => this.hud.toast(COPY.landPrompt, 9000), 6500);
         break;
       }
       case 'correction': {

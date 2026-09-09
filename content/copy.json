@@ -214,7 +214,8 @@
     "oddsNote": "Your first conveyor includes one guaranteed common starter seed in its first slot. Other slots and later conveyors follow these odds. Your rarity floor raises the minimum tier offered. Regular top-tier odds are the same for everyone.",
     "guestLand": "Guest garden, 4 plots. Connect a wallet later to see your land.",
     "toyLand": "Starter garden, 6 plots.",
-    "controls": "Move: arrows / WASD / tap. Interact: tap a plot or press E."
+    "controls": "Move: arrows / WASD / tap. Interact: tap a plot or press E.",
+    "landPrompt": "Tap LAND to link a wallet: it shapes your garden, and holding 100,000 PonsGarden coin or 100 PONS puts you on the season prize board."
   },
   "tiers": {
     "common": "Common",

@@ -22,7 +22,7 @@ import { currentProfile, recordSteal, recordTag, recordMission, setSprintRecord,
 import { seasonEnd, seasonNumberAt, bookValue, scoreOf, standings, SEASON_ONE_START_MS } from '../../shared/season';
 import { SECTORS } from '../../shared/roster';
 import { sectorMovePct } from '../../shared/market';
-import { requestBrief, logBrief, BRIEF_INTERVAL_MS, type Brief } from './market-brief';
+import { requestBrief, logBrief, composeHeadline, BRIEF_INTERVAL_MS, type Brief } from './market-brief';
 import copyJson from '../../content/copy.json';
 
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
@@ -894,7 +894,7 @@ export class Game {
   marketTick(now: number): void {
     if (!this.brief || now - this.brief.at >= BRIEF_INTERVAL_MS) {
       const at = now;
-      this.brief = this.brief ?? { at, overrides: new Map(), headline: 'The market opens.', source: 'fallback' };
+      this.brief = this.brief ?? { at, overrides: new Map(), colour: 'The market opens.', headline: 'The market opens.', source: 'fallback' };
       if (!this.briefPending) {
         this.briefPending = true;
         const digest = { season: seasonNumberAt(now), players: this.live.size, ...(this.lastSteal ? { lastSteal: this.lastSteal } : {}) };
@@ -922,7 +922,7 @@ export class Game {
     for (const [id, l] of this.live) {
       const st = rank.get(id);
       this.send(l.ws, {
-        t: 'market', sectors, headline: this.brief.headline,
+        t: 'market', sectors, headline: composeHeadline(this.brief, now),
         season: { n: season, endsAt },
         ...(st ? { standing: { score: st.score, rank: st.rank, players: table.length, eligible: st.eligible } } : {}),
       });

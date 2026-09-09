@@ -35,7 +35,7 @@ export function renderTape(mv: MarketView): void {
   tape.hidden = false;
   // Publish the tape's real height so the HUD and feed sit below it at every width,
   // rather than below a number somebody guessed once.
-  document.documentElement.style.setProperty('--tape-h', `${tape.offsetHeight}px`);
+  publishHeight(tape);
 
   const moves = Object.entries(mv.sectors)
     .sort((a, b) => b[1] - a[1])
@@ -66,4 +66,25 @@ export function renderTape(mv: MarketView): void {
 /** Keep the countdown ticking between server messages. */
 export function startTapeClock(): void {
   setInterval(() => { if (last) renderTape(last); }, 1000);
+}
+
+/**
+ * Publish the tape's real height so the HUD and feed clear it.
+ *
+ * Measured rather than assumed, and re-measured on resize: the tape grows a row when the
+ * headline wraps, and a HUD pinned to a number somebody guessed once ends up tucked under
+ * the ticker. getBoundingClientRect is used over offsetHeight because it is fractional -
+ * offsetHeight rounds down, which is exactly enough to clip the top of the Sap box.
+ */
+let observed: Element | null = null;
+function publishHeight(tape: HTMLElement): void {
+  const set = () => {
+    const h = Math.ceil(tape.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--tape-h', `${h}px`);
+  };
+  set();
+  if (observed !== tape && typeof ResizeObserver !== 'undefined') {
+    observed = tape;
+    new ResizeObserver(set).observe(tape);
+  }
 }

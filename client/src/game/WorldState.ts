@@ -170,6 +170,11 @@ export class WorldState {
           `${COPY.village}: ${this.villageName}. ${COPY.controls}`,
           6000,
         );
+        // Second beat, after the controls have had the screen to themselves: how to get on
+        // the prize board. Only shown to players who have not linked a wallet yet.
+        if (!this.you?.land?.address) {
+          setTimeout(() => this.hud.toast(COPY.landPrompt, 9000), 6500);
+        }
         break;
       }
       case "correction": {

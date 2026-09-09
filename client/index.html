@@ -16,11 +16,11 @@
     button:active { transform:translate(1px,1px); box-shadow:1px 1px 0 #000; }
     button:disabled { opacity:.45; cursor:default; }
     input { font-family:inherit; font-size:9px; color:var(--text); background:#120c18; border:2px solid var(--edge); padding:7px 8px; outline:none; }
-    #hud { position:fixed; top:calc(var(--tape-h, 40px) + 8px); left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:7px 9px; line-height:1.8; pointer-events:none; max-width:46vw; }
+    #hud { position:fixed; top:calc(var(--tape-h, 44px) + 10px); left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:7px 9px; line-height:1.8; pointer-events:none; max-width:46vw; }
     #hud .sap { color:var(--sap); }
     #hud .dim { color:var(--dim); font-size:7px; }
     #carry { color:#ff8080; font-size:7px; }
-    #feed { position:fixed; top:calc(var(--tape-h, 40px) + 8px); right:8px; width:min(44vw,300px); pointer-events:none; font-size:7px; line-height:1.6; }
+    #feed { position:fixed; top:calc(var(--tape-h, 44px) + 10px); right:8px; width:min(44vw,300px); pointer-events:none; font-size:7px; line-height:1.6; }
     .fe { background:rgba(24,18,32,.85); border-left:3px solid var(--edge); padding:4px 6px; margin-bottom:3px; }
     .fe-steal { border-color:#ff5555; } .fe-tag { border-color:#6cd46c; } .fe-gate, .fe-break { border-color:var(--sap); } .fe-reveal { border-color:#c26bff; } .fe-join { border-color:#8fc3ff; }
     #chatlog { position:fixed; left:8px; bottom:calc(58px + env(safe-area-inset-bottom)); font-size:7px; line-height:1.7; pointer-events:none; max-width:60vw; }

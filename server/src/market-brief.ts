@@ -24,6 +24,9 @@ export interface Brief {
   at: number;
   /** Sector -> position in [-1,1]. Empty means "let the deterministic walk run". */
   overrides: Map<Sector, number>;
+  /** The Oracle sentence only. The sector lead is composed at BROADCAST time, not here,
+   *  so the figure in the headline always matches the ticker underneath it. */
+  colour: string;
   headline: string;
   /** How the headline was produced. Surfaced in the log, never to players. */
   source: 'oracle' | 'fallback';
@@ -116,10 +119,6 @@ export function cleanHeadline(
  * stops, and the game must outlive the model.
  */
 export async function requestBrief(d: VillageDigest, now: number): Promise<Brief> {
-  const { sector, pct, company } = leadStory(now);
-  const verbs = pct >= 0 ? VERB_UP : VERB_DOWN;
-  const verb = verbs[Math.floor(Math.abs(now) / BRIEF_INTERVAL_MS) % verbs.length];
-  const lead = `${sector.toUpperCase()} ${verb} ${pct >= 0 ? '+' : ''}${pct}%.`;
 
   let text: string | null = null;
   try {
@@ -129,14 +128,15 @@ export async function requestBrief(d: VillageDigest, now: number): Promise<Brief
     text = null;   // law 4: an unreachable Oracle is a quiet market, never an error
   }
 
+  const { company } = leadStory(now);
   const { text: colour, source } = cleanHeadline(text, now, company);
   const theft = d.lastSteal ? ` ${d.lastSteal.thief} took a ${d.lastSteal.plant} from ${d.lastSteal.victim}.` : '';
-  const headline = source === 'oracle' ? `${lead} ${company}: ${colour}${theft}` : `${lead}${theft || ` ${colour}`}`;
+  const body = source === "oracle" ? `${company}: ${colour}${theft}` : `${colour}${theft}`;
 
   // Law 1: we take the model's WORDS, not its numbers. Sector positions stay with the
   // deterministic walk until a validated numeric channel exists, so there is currently no
   // path by which a model response can move a player's yield at all.
-  return { at: now, overrides: new Map(), headline, source };
+  return { at: now, overrides: new Map(), colour: body, headline: body, source };
 }
 
 /** Law 3. One JSON line per brief, alongside the prize ledger. */
@@ -154,4 +154,19 @@ export function logBrief(dir: string, b: Brief, d: VillageDigest): void {
       'utf8',
     );
   } catch { /* logging must never take the game down */ }
+}
+
+/**
+ * Compose the tape headline at BROADCAST time.
+ *
+ * The sector lead has to be recomputed on every tick, not baked into the brief: a brief is
+ * up to five minutes old, and a headline reading "SHELLS gains +8%" directly above a
+ * ticker reading "SHELL -5.8%" is worse than no headline at all.
+ */
+export function composeHeadline(brief: Brief, now: number): string {
+  const { sector, pct } = leadStory(now);
+  const verbs = pct >= 0 ? VERB_UP : VERB_DOWN;
+  const verb = verbs[Math.floor(now / BRIEF_INTERVAL_MS) % verbs.length];
+  const lead = `${sector.toUpperCase()} ${verb} ${pct >= 0 ? '+' : ''}${pct}%.`;
+  return `${lead} ${brief.colour}`.trim();
 }
