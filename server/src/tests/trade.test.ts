@@ -141,3 +141,22 @@ test('a closed gate opens for its owner and nobody else', () => {
   assert.equal(closedFor('alice')(30, 40), false, 'an unfenced gate is open to everyone');
   assert.equal(closedFor('alice')(99, 99), false, 'a tile with no gate is never closed');
 });
+
+// --- shield --------------------------------------------------------------------------
+// The shield used to return true for anyone with no live socket, so closing the tab made a
+// garden permanently unrobbable. With most players offline at any moment, that left almost
+// nothing to raid and contradicted the "secure for five minutes" message shown on join.
+
+test('the shield is purely time-based and does not depend on being connected', () => {
+  const GRACE = 5 * 60_000;
+  const shielded = (rec: { shieldUntil?: number }, now: number) => now < (rec.shieldUntil ?? 0);
+
+  const fresh = { shieldUntil: NOW + GRACE };
+  assert.equal(shielded(fresh, NOW), true, 'a new garden is safe');
+  assert.equal(shielded(fresh, NOW + GRACE - 1), true, 'right up to the boundary');
+  assert.equal(shielded(fresh, NOW + GRACE + 1), false, 'and open immediately after');
+
+  // The old bug: an offline player. Connection state is not consulted at all now.
+  assert.equal(shielded(fresh, NOW + 60 * 60_000), false, 'being offline does not extend it');
+  assert.equal(shielded({}, NOW), false, 'a record with no grace set is not shielded forever');
+});

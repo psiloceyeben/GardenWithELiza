@@ -18,7 +18,8 @@ async function setup() {
   const owner = game.join(socket(), { t: 'hello', id: 'raidowner001', secret: 'owner-secret', name: 'Owner' })!;
   const thief = game.join(socket(), { t: 'hello', id: 'raidthief001', secret: 'thief-secret', name: 'Thief' })!;
   const rec = game.players.get(owner.id)!, attacker = game.players.get(thief.id)!; const now = Date.now();
-  owner.shieldUntil = 0; thief.shieldUntil = 0; rec.sap = 2000;
+  // The shield now lives on the RECORD, not the socket, so it survives a disconnect.
+  owner.shieldUntil = 0; thief.shieldUntil = 0; rec.shieldUntil = 0; attacker.shieldUntil = 0; rec.sap = 2000;
   rec.plots[0] = { uid: 'original', speciesId: 'husk_holdings', tier: 'common', plantedAt: now - 60000, growMs: 30000,
     revealed: true, size: 1, mutation: 'none', watered: false, lastWeeded: now };
   const plot = game.lot(rec).plots[0]; thief.x = plot.tx * TILE + 16; thief.y = plot.ty * TILE + 16;
@@ -48,7 +49,7 @@ test('replaced plant or newly shielded owner invalidates pending uproot', async 
     const { game, owner, thief, rec, attacker, now } = await setup();
     try {
       game.onUproot(thief, attacker, rec.id, 0, now); assert(thief.channel); const end = thief.channel.endsAt;
-      if (change === 'replace') rec.plots[0] = { ...rec.plots[0]!, uid: 'replacement' }; else owner.shieldUntil = end + 1000;
+      if (change === 'replace') rec.plots[0] = { ...rec.plots[0]!, uid: 'replacement' }; else { owner.shieldUntil = end + 1000; rec.shieldUntil = end + 1000; }
       game.completeChannel(thief, attacker, end); assert(rec.plots[0]); assert.equal(thief.carry, null);
     } finally { await game.store.close(); }
   }
@@ -63,7 +64,7 @@ test('fence purchase, duplicate purchase, repair and insufficient funds have exa
   } finally { await game.store.close(); }
 });
 
-for (const change of ['move', 'full', 'cap', 'owner-offline', 'thief-offline'] as const) {
+for (const change of ['move', 'full', 'cap', 'thief-offline'] as const) {
   test(`pending uproot is cancelled when eligibility changes: ${change}`, async () => {
     const { game, thief, rec, attacker, now } = await setup();
     try {
@@ -71,13 +72,29 @@ for (const change of ['move', 'full', 'cap', 'owner-offline', 'thief-offline'] a
       if (change === 'move') thief.x += 7;
       if (change === 'full') attacker.plots = attacker.plots.map((_, i) => ({ ...rec.plots[0]!, uid: `occupied-${i}` }));
       if (change === 'cap') rec.stolenLog = Array(STEAL_CAP_PER_HOUR).fill(now);
-      if (change === 'owner-offline') game.leave(rec.id);
       if (change === 'thief-offline') game.leave(attacker.id);
       game.completeChannel(thief, attacker, end);
       assert.equal(rec.plots[0]?.uid, 'original'); assert.equal(thief.carry, null); assert(!attacker.carried);
     } finally { await game.store.close(); }
   });
 }
+test('an owner going offline does NOT save their plants', async () => {
+  // This used to cancel the theft, because isShielded returned true for anyone without a
+  // live socket. Closing the tab was therefore perfect protection, which left most of the
+  // village unrobbable and gutted the loop the game is built on. Being raided while away is
+  // the tension; defences are the answer to it.
+  const { game, thief, rec, attacker, now } = await setup();
+  try {
+    game.onUproot(thief, attacker, rec.id, 0, now);
+    assert(thief.channel);
+    const end = thief.channel.endsAt;
+    game.leave(rec.id);
+    game.completeChannel(thief, attacker, end);
+    assert.equal(rec.plots[0], null, 'the plant should be gone from the offline owner');
+    assert(thief.carry, 'and the thief should be carrying it');
+  } finally { await game.store.close(); }
+});
+
 test('mythic owner leaving their lot during uproot keeps the plant protected', async () => {
   const { game, owner, thief, rec, attacker, now } = await setup();
   try {
@@ -99,7 +116,7 @@ test('gate requires three completed hits and a newly shielded owner cancels dama
     }
     game.onShop(owner, rec, 'repair', undefined, clock); assert.equal(rec.defenses.gateHp, 3);
     game.onBreak(thief, attacker, rec.id, clock); assert(thief.channel); const end = thief.channel.endsAt;
-    owner.shieldUntil = end + 1; game.completeChannel(thief, attacker, end); assert.equal(rec.defenses.gateHp, 3);
+    owner.shieldUntil = end + 1; rec.shieldUntil = end + 1; game.completeChannel(thief, attacker, end); assert.equal(rec.defenses.gateHp, 3);
   } finally { await game.store.close(); }
 });
 test('defense purchases charge once and keep private/decoy information private', async () => {

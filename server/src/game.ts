@@ -62,6 +62,7 @@ export interface PlayerRec {
   missions?: P.MissionState;    // town missions: active progress + day each was last completed
   carried?: { plant: Plant; from: string; fromPlot: number } | null;
   profile?: import('../../shared/season').PlayerProfile;   // season tally, history, endowment, vintages
+  shieldUntil?: number;         // new-garden grace, persisted so it survives a reconnect
   lastClaim?: string;           // claim period key, noon PT to noon PT
   claimStreak?: number;
   agent?: boolean;              // ElizaOS or other automated player; ranks publicly, never paid
@@ -157,7 +158,16 @@ export class Game {
   }
   map(rec: PlayerRec): Village { return this.maps.get(this.vid(rec))!; }
   lot(rec: PlayerRec): Lot { return this.homeMap(rec).lots[rec.lotId]; }
-  isShielded(rec: PlayerRec, now: number): boolean { const l = this.live.get(rec.id); return !l || now < l.shieldUntil; }
+  /**
+   * A new garden is safe for GRACE_MS, and that is the whole rule.
+   *
+   * This used to return true for any player with no live socket, which meant closing the
+   * tab made a garden permanently unrobbable. With most players offline at any moment that
+   * left almost nothing to raid, and it contradicted the "secure for five minutes" message
+   * shown on join. Being raided while away is the tension the game is built on; defences
+   * are what you buy to answer it.
+   */
+  isShielded(rec: PlayerRec, now: number): boolean { return now < (rec.shieldUntil ?? 0); }
   /**
    * Is this gate shut for the player who is trying to walk through it?
    *
@@ -344,7 +354,9 @@ export class Game {
     if (rec.visiting && !this.villages.has(rec.visiting)) rec.visiting = null;
     if (rec.plotCount < DEFAULT_PLOTS) { while (rec.plots.length < DEFAULT_PLOTS) { rec.plots.push(null); rec.lockedUntil.push(0); } rec.plotCount = DEFAULT_PLOTS; this.store.touch(); }
     const spawn = this.spawnFor(rec);
-    const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null, lastLot: -1, lastAskAt: 0 };
+    // The grace window is set once when the garden is created (see newPlayer). A reconnect
+    // keeps whatever is left of it rather than granting a fresh five minutes per refresh.
+    const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: rec.shieldUntil ?? 0, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null, lastLot: -1, lastAskAt: 0 };
     this.live.set(id, live);
     this.sendWelcome(live, rec, now);
     // AFTER the welcome, never before: a client that receives a toast with no state yet
@@ -468,6 +480,7 @@ export class Game {
       conveyor: { slots: E.rollStarterConveyor(this.rng, ROSTER, plotCount), refreshAt: now + E.CONVEYOR_REFRESH_MS },
       speedLevel: 0, rarityFloor: 'common', defenses: { gateMax: 0, gateHp: 0, gnome: false, sprinkler: false, scarecrow: false, mud: false, bell: false },
       villageId: village.id, lotId, createdAt: now, lastSeen: now,
+      shieldUntil: now + GRACE_MS,
       stats: { seedsBought: 0, reveals: 0, steals: 0, tags: 0, stolenFrom: 0 }, stolenLog: [],
       address: null, garden: null, visiting: null, stolenBy: [],
     };
