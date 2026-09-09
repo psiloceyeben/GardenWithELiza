@@ -66,6 +66,16 @@
   .cta:hover{transform:translate(2px,2px);box-shadow:4px 4px 0 var(--brown2)}
   .cta-sub{display:block;margin-top:14px;color:var(--dim);font-size:12px}
   .eliza-sub{margin-top:6px;color:var(--brown);letter-spacing:.5px}
+  /* Contract address. Labelled and copyable rather than a bare string, so it reads as a
+     reference the way an explorer shows one. */
+  .ca-box{display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;
+    background:#2f2318;color:#f4e7cd;border:2px solid var(--brown2);padding:9px 14px;margin:0 auto 26px;
+    box-shadow:4px 4px 0 rgba(94,54,22,.22)}
+  .ca-tag{color:var(--gold);font-weight:700;letter-spacing:1px;flex:none}
+  .ca-addr{font-size:clamp(9px,1.9vw,13px);word-break:break-all;color:#e8dcc4;background:transparent;padding:0}
+  .ca-copy{background:var(--green);color:#fff;border:2px solid #24410f;font:700 11px/1 var(--mono);
+    padding:6px 12px;cursor:pointer;flex:none;letter-spacing:.5px}
+  .ca-copy:hover{transform:translate(1px,1px)}
   /* Top banner: the wordmark over a row of the game's own plants, drawn from the atlas. */
   .banner{margin:0 auto 26px}
   .banner-title{font-size:clamp(20px,3.6vw,34px);color:var(--ink);letter-spacing:1px;margin-bottom:22px}
@@ -170,6 +180,12 @@
 
 <!-- ============================ HERO ============================ -->
 <div class="hero"><div class="wrap">
+  <div class="ca-box">
+    <span class="ca-tag">$GARDEN</span>
+    <code class="ca-addr" id="caAddr">0x518563e4194a9833e3a80e6344bdb033a7130d7a</code>
+    <button class="ca-copy" id="caCopy" type="button">copy</button>
+  </div>
+
   <div class="banner">
     <div class="banner-title">🌱 Garden With Eliza</div>
     <div class="banner-row" id="bannerRow"></div>
@@ -568,6 +584,25 @@ export const character = {
     // Stagger is deliberate: a row breathing in perfect unison looks mechanical.
     setInterval(() => { bf = (bf + 1) % 6; paintBanner(); }, 200);
     small.addEventListener('change', paintBanner);
+  }
+
+  // Copy the contract address. Falls back to a selection when the clipboard API is blocked,
+  // which it is in some in-app browsers.
+  const caCopy = document.getElementById('caCopy');
+  const caAddr = document.getElementById('caAddr');
+  if (caCopy && caAddr) {
+    caCopy.addEventListener('click', async () => {
+      const text = caAddr.textContent.trim();
+      let done = false;
+      try { await navigator.clipboard.writeText(text); done = true; } catch { /* blocked */ }
+      if (!done) {
+        const r = document.createRange(); r.selectNodeContents(caAddr);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        try { done = document.execCommand('copy'); } catch { done = false; }
+      }
+      caCopy.textContent = done ? 'copied' : 'select it';
+      setTimeout(() => { caCopy.textContent = 'copy'; }, 1600);
+    });
   }
   paint(); setInterval(paint, 5000);
 </script>
