@@ -1,0 +1,17 @@
+# Pons Garden — https://ponsgarden.com
+# Operated by Prometheus7 Research Institute.
+
+Contact: mailto:benhorn99@gmail.com
+Expires: 2027-09-09T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://ponsgarden.com/.well-known/security.txt
+Policy: https://ponsgarden.com/terms.html
+
+# Pons Garden is a free browser game. It does not take custody of any asset, never
+# constructs, signs or relays a blockchain transaction, and never asks for a seed phrase,
+# private key, password or payment detail. Wallet linking is optional, is offered only
+# in-game, and asks the wallet for exactly two things: the public address, and a signature
+# on a plain-text sentence stating that it is free and is not a transaction.
+#
+# If you believe this site is impersonating another service or behaving maliciously,
+# please write to the contact address above. We will respond the same day.

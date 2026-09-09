@@ -74,11 +74,20 @@ export class Hud {
     $('wallets').querySelectorAll<HTMLButtonElement>('[data-wallet]').forEach((b) => b.addEventListener('click', () => { const n = nameOf() || `Gardener ${Math.floor(Math.random() * 900 + 100)}`; m.hidden = true; cb(n, b.dataset.wallet!); }));
   }
 
-  /** The four wallet options; missing ones show an install link instead of a button. */
+  /**
+   * Wallet buttons - ONLY for wallets actually present in this browser.
+   *
+   * This used to list all four by name with outbound "Install" links for the ones you did
+   * not have. On a brand-new domain that also shows company names, that is hard to tell
+   * apart from a crypto phishing page, and Google Safe Browsing flagged the site for it on
+   * launch day. It was near-zero value anyway: linking a wallet is optional and available
+   * in-game from the land button.
+   */
   walletButtons(): string {
-    return `<div class="wallets">${detectWallets().map(({ def, installed }) => installed
-      ? `<button data-wallet="${def.id}">${def.name}</button>`
-      : `<span class="wallet-missing">${def.name} · ${COPY.notInstalled} <a href="${def.url}" target="_blank" rel="noopener">${COPY.install}</a></span>`).join('')}</div>`;
+    const present = detectWallets().filter((w) => w.installed);
+    if (!present.length) return "";
+    return `<div class="wallets">${present.map(({ def }) =>
+      `<button data-wallet="${def.id}">${def.name}</button>`).join("")}</div>`;
   }
 
   // ------------------------------------------------------------ joystick (touch)
