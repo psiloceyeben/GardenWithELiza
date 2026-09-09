@@ -3,13 +3,16 @@ import type { MutationId } from '@shared/types';
 import { mergeStatic } from './merge-static';
 
 export const MODEL_SPECIES=['gorbulon_sprig','plain_gerald','concerned_radish','unlicensed_carrot','clammy_pete','cactusberry_vicar','sir_blombus','weeping_wumbus','melonhound','pumpkin_esquire','corn_that_knows','bamboo_inspector','duchess_turnip','lord_eggplant','yelling_tuber','low_ambition_tulip','sunflower_who_lied','bogwort','bartholomew_bean','pineapple_enforcer','grabby_bertrand','fraudulent_orchid'] as const;
-export const hasPlantModel=(species:string)=>MODEL_SPECIES.some(id=>id===species);
+const MODEL_ALIAS:Record<string,string>={husk_holdings:'corn_that_knows',rugg_capital:'gorbulon_sprig',moonwort:'plain_gerald',bagholly:'bartholomew_bean',pennysprout:'gorbulon_sprig',fernance_brothers:'bamboo_inspector',panopticus_palm:'bamboo_inspector',voltvine:'grabby_bertrand',ticker_tulip:'low_ambition_tulip',sprout_and_sons:'bartholomew_bean',divvy_fig:'bartholomew_bean',bullrush:'bamboo_inspector',everbloom:'sunflower_who_lied',middling_mills:'corn_that_knows',orchard_prime:'cactusberry_vicar',beargonia:'fraudulent_orchid',aunt_hazels:'bartholomew_bean',mahogany_board:'bamboo_inspector',cornerstone_cactus:'clammy_pete',custodian_cypress:'bamboo_inspector',circuit_sequoia:'bamboo_inspector',blue_chip_oak:'pumpkin_esquire',trillion_thistle:'pineapple_enforcer',orchard_giant:'melonhound',softwood:'sir_blombus',the_index:'bartholomew_bean',steady_eddy:'bamboo_inspector',short_squeeze:'grabby_bertrand',hedgeaway:'bartholomew_bean',reserve_bloom:'sunflower_who_lied'};
+/** Listed species reuse authored models until the dedicated art pass lands (release plan 1.5). Ids are stable, so swapping a model later touches only this map. */
+const modelId=(s:string):string=>MODEL_ALIAS[s]??s;
+export const hasPlantModel=(species:string)=>MODEL_SPECIES.some(id=>id===modelId(species));
 /** Authored species conversions; unsupported species retain their sprites. */
 export function plantModel(species:string,stage:number):THREE.Group|null {
-  const root=authoredPlantModel(species,stage);
+  const root=authoredPlantModel(modelId(species),stage);
   if(root){
     mergeStatic(root);
-    if(species==='low_ambition_tulip' && stage>=4){
+    if(modelId(species)==='low_ambition_tulip' && stage>=4){
       const body=new THREE.Group();body.name='sleepy-tulip-body';
       // Soil owns a distinct material, so batching leaves it separate.
       for(const child of [...root.children])if(child instanceof THREE.Mesh && child.material!==root.userData.materials[2])body.add(child);

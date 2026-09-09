@@ -1,6 +1,7 @@
 // Layer G economy. Every constant here is [TUNABLE] per bible §3 / §5.
 // LAW (I-6, I-7): Sap is the only currency. Nothing here references tokens.
-import type { Tier, MutationId, Species, Plant, ConveyorSlot } from './types';
+import type { Tier, MutationId, Species, Plant, ConveyorSlot, Sector } from './types';
+import { marketMult } from './market';
 
 export const TIERS: Tier[] = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
 export const tierIndex = (t: Tier): number => TIERS.indexOf(t);
@@ -51,9 +52,10 @@ export const WEEDY_AFTER_MS = 20 * 60_000;   // untended this long -> weeds halv
 export const WEEDY_FACTOR = 0.5;
 export const isWeedy = (p: Plant, now: number): boolean => p.revealed && now - p.lastWeeded > WEEDY_AFTER_MS;
 
-export function sapPerSec(p: Plant, sp: Species, now = Date.now()): number {
+export function sapPerSec(p: Plant, sp: Species, now = Date.now(), market?: ReadonlyMap<Sector, number>): number {
   if (!p.revealed) return 0;
-  return sp.sapBase * p.size * mutationMult(p.mutation) * (isWeedy(p, now) ? WEEDY_FACTOR : 1);
+  // Market multiplier last: a plant's worth is its species, its roll, its care, then the market.
+  return sp.sapBase * p.size * mutationMult(p.mutation) * (isWeedy(p, now) ? WEEDY_FACTOR : 1) * marketMult(sp.tier, sp.sector, now, market);
 }
 
 export function weightedPick<T>(rng: () => number, items: T[], weight: (t: T) => number): T {
