@@ -103,27 +103,91 @@ real company. It is a curve in the game's own memory.
 **Mutations survive unchanged** and stack on top: Golden ×4, Holographic ×6, Colossal ×3,
 Feral ×5, Backwards ×2, Screaming ×8. Odds published in the interface.
 
-**The characters.** Nineteen exist. The keepers stay — Gorbulon Sprig, Weeping Wumbus,
-Plain Gerald, The Unlicensed Carrot, Pumpkin Esquire, The Corn That Knows. Some get edited
-toward the market read, and roughly twenty more get added across the tiers so every tier
-has a full stable. The new ones are market archetypes as characters, not companies:
+## 4a. The board — thirty listed companies
 
-- **Penny.** *Shellcorn*, an ear of corn that is completely hollow. *Rugweed*, a vine that
-  pulls its own roots up while you watch. *Bagholly*, clutching a sack, refusing eye
-  contact.
-- **Small Cap.** *The Fernance Bro*, slicked leaves, will explain something to you.
-  *Ticker Tulip*, whose petals scroll.
-- **Mid Cap.** *Divvy Fig*, drips one bead of syrup on a schedule and is very proud of it.
-  *Beargonia*, a begonia with a grumpy bear's face, permanently disappointed.
-- **Blue Chip.** *Blue Chip Oak*, with actual chips for leaves. *Custodian Cypress*, tiny
-  visor, holds everyone else's things.
-- **Megacap.** *Trillion Thistle*, too big for its pot and unbothered. *Circuit Sequoia*.
-- **Index.** *The Index*, a hedge made entirely of smaller hedges, all of them nodding at
-  slightly different times.
+Every plant is a listed company with a **ticker** and a **sector**. The ticker is what sells
+the larp: four letters on a fence sign, on the notice board, on the ticker tape running
+across the top of the plaza. Nobody needs a real company's name to feel like they are
+trading, they need a symbol that moves.
+
+### Penny — the junk drawer
+
+| Ticker | Company | Sector | The character |
+|---|---|---|---|
+| HUSK | Husk Holdings | Shells | An ear of corn, completely hollow. Rattles when the wind blows. |
+| RUGG | Rugg Capital | Shells | A vine that pulls its own roots up while you watch it. |
+| BAGZ | Bagholly & Co. | Shells | A holly bush clutching a sack, refusing eye contact. |
+| MOON | Moonwort Ventures | Growth | Always about to. Has been about to for some time. |
+| PNNY | Pennysprout | Shells | A wide-eyed seedling holding a cardboard sign. |
+
+### Small Cap — the pitch deck
+
+| Ticker | Company | Sector | The character |
+|---|---|---|---|
+| FRNC | Fernance Brothers | Financials | Slicked leaves. Will explain something to you. |
+| TCKR | Ticker Tulip | Growth | Its petals scroll. You can read them if you stand still. |
+| SEED | Series Seedling | Growth | Perpetually raising. Never closes. |
+| KALE | Kalefornia Dynamics | Energy | Sunny, enormous claims, thin roots. |
+| SPRT | Sprout & Sons | Staples | Family business. The sons are not involved. |
+
+### Mid Cap — the workhorses
+
+| Ticker | Company | Sector | The character |
+|---|---|---|---|
+| DIVI | Divvy Fig | Staples | Drips one bead of syrup on a schedule and is very proud of it. |
+| BEAR | Beargonia | Financials | A begonia with a grumpy bear's face. Permanently disappointed. |
+| BULL | Bullrush | Financials | Charges its own fence. Every time. |
+| MIDL | Middling Mills | Staples | Wheat. Unremarkable. Has never missed a quarter. |
+| HZEL | Aunt Hazel's Preserves | Staples | Jam. Only jam. Since forever. |
+
+### Blue Chip — the establishment
+
+| Ticker | Company | Sector | The character |
+|---|---|---|---|
+| OAKX | Blue Chip Oak | Financials | Actual blue chips for leaves. They clink. |
+| CSTD | Custodian Cypress | Financials | Tiny visor. Holds everyone else's things. |
+| BORD | Mahogany Board | Financials | A tree shaped like a boardroom table. Seats nine. |
+| CNRS | Cornerstone Cactus | Financials | Has not moved since it was planted. Will not. |
+| EVBL | Everbloom Pharma | Biotech | One flower. Cures one thing. Charges accordingly. |
+
+### Megacap — the giants
+
+| Ticker | Company | Sector | The character |
+|---|---|---|---|
+| TRIL | Trillion Thistle | Semis | Too big for its pot. Unbothered by this. |
+| CRCT | Circuit Sequoia | Semis | Hums. The hum gets louder before it spikes. |
+| VOLT | Voltvine | Energy | Electric tendrils. Arcs to the fence in a storm. |
+| PRME | Orchard Prime | Retail | Delivers its own fruit to your other plots. Uninvited. |
+| PNPT | Panopticus Palm | Adtech | Many eyes. Watches the whole village. Knows who took what. |
+
+### Index — the untouchables
+
+| Ticker | Company | Sector | The character |
+|---|---|---|---|
+| NDEX | The Index | Funds | A hedge made of smaller hedges, all nodding slightly out of sync. |
+| TRST | Steady Eddy Trust | Funds | Ancient, boring, enormous. Outlives everything around it. |
+| SQZE | The Short Squeeze | Funds | A coiled vine. Snaps once, spectacularly, then is spent. |
+| HALT | Halted Hydrangea | Funds | Freezes its own plot. Nothing enters or leaves while it sits. |
+| DLST | The Delisted | Funds | A ghost stump that somehow still pays. Nobody asks. |
+
+**Sectors are the mechanic, not decoration.** Ten sectors, and volatility moves *by sector*.
+When Semis rip, TRIL and CRCT spike together for ten minutes and the whole village runs at
+those two gardens at once. When Financials sell off, five plants dim at the same moment and
+the raid pressure moves elsewhere. Sector-wide moves are what makes it read as a market
+instead of as a slot machine, and they create coordinated village-scale events for free.
+
+**The ticker tape** runs across the top of the plaza showing every sector's move in real
+time. It is the single cheapest thing in the entire design and it will do more for the larp
+than any name ever could.
+
+**Also on the board:** earnings days, where one company reports and gaps up or down on
+reveal. Halts, where HALT does what it does. And the keepers stay — Gorbulon Sprig, Weeping
+Wumbus, Plain Gerald, The Unlicensed Carrot, Pumpkin Esquire and The Corn That Knows remain
+as unlisted heirloom species, off the board, no ticker, pure brainrot. The market is one
+half of the garden and the nonsense is the other.
 
 **The roster is a data file**, `content/roster.json`, with a schema and a lint. Names, art
-and flavour swap without touching a line of game code. See §10 for the one open decision
-about what may go in it.
+and flavour swap without touching a line of game code. See §10 for the naming decision.
 
 ## 5. The village
 
@@ -301,13 +365,33 @@ method throws. There is no code path in the repository that could move an asset.
 Everything above is buildable now except two points, both worth deciding deliberately
 rather than by default.
 
-**The roster contents.** The mechanism in §4 works identically whether the roster holds
-original characters or real tickers, because the roster is data. Shipping original
-characters is the recommendation, on plain trademark grounds rather than securities ones:
-company names, tickers and logos are registered marks, and putting them on game items that
-players trade and that settle into a prize competition is the fact pattern that draws
-letters. It also loses nothing — *Beargonia* is funnier than a ticker, and it is ours. If
-real names are wanted, the roster file is where that decision lands, after review.
+**The roster contents.** The mechanism in §4 and the board in §4a work identically whatever
+names sit in the roster, because the roster is data. The recommendation is the fictional
+board as written, and the reasoning is trademark, not securities.
+
+Three points, since a modified-name approach has been proposed:
+
+1. **Copyright is not the relevant regime.** Copyright does not protect names or short
+   phrases at all. Trademark does, and it turns on **likelihood of confusion**. Separately,
+   famous marks get **dilution by blurring** under Lanham Act §43(c), which requires no
+   confusion, no competition and no damages to be actionable.
+2. **A real mark plus a suffix is the weakest available form.** "Nvidiaplant" contains the
+   mark whole and appends a descriptive word. That is the standard confusingly-similar
+   construction, not a parody, and it is a stronger case against us than using the bare mark
+   would be in an obviously satirical context.
+3. **The parody shelter has narrowed.** *Jack Daniel's Properties v. VIP Products* (2023)
+   held that where a mark is used **as a source identifier for the defendant's own goods**,
+   the Rogers test does not apply and ordinary infringement and dilution analysis governs.
+   A plant whose product name is a real company's mark, bought with in-game currency and
+   settling into a cash prize competition, sits squarely inside that holding.
+
+The realistic outcome is not litigation, it is a cease-and-desist and a forced reskin after
+launch, at the moment when the names are load-bearing for the community.
+
+**And the design goal survives intact without any of it.** The market feeling comes from
+tickers, sectors, sector-wide moves and the ticker tape — mechanics, not nouns. Fictional
+tickers deliver the whole larp and are ours to keep. *Panopticus Palm* is funnier than the
+company it evokes, and it can go on merchandise.
 
 **Trading settled Sap for coin.** The season already sends real value out: a hundred
 dollars a week to the top three. That is a tournament prize, decided by rank, and
