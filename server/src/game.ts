@@ -47,6 +47,7 @@ export interface PlayerRec {
   weekly?: P.Weekly;            // trophies, reset each ISO week
   missions?: P.MissionState;    // town missions: active progress + day each was last completed
   carried?: { plant: Plant; from: string; fromPlot: number } | null;
+  profile?: import('../../shared/season').PlayerProfile;   // season tally, history, endowment, vintages
 }
 const dayKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
 const DEFAULT_COS: P.Cosmetics = { fence: 'wood', lantern: false, nameplate: false, path: false, gnomeHat: -1 };

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pons Garden — Season Rules</title>
+<style>
+  :root{--bg:#1a1410;--panel:#241c16;--ink:#f0e8d2;--dim:#b9a98f;--line:#3a2e24;--accent:#8cd25a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;padding:24px 16px}
+  main{max-width:760px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px;letter-spacing:.5px}
+  h2{font-size:15px;margin:32px 0 8px;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .sub{color:var(--dim);margin:0 0 24px;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:normal}
+  .box{background:var(--panel);border:1px solid var(--line);padding:14px 16px;margin:16px 0}
+  .box strong{color:var(--accent)}
+  ul{padding-left:20px}li{margin:5px 0}
+  a{color:var(--accent)}
+  footer{margin:40px 0 0;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:12px}
+  code{background:#0f0c0a;padding:1px 5px;border-radius:2px}
+</style>
+</head>
+<body><main>
+
+<h1>Season Rules</h1>
+<p class="sub">Pons Garden · operated by Prometheus7 Research Institute · last updated 8 September 2026</p>
+
+<div class="box">
+  <strong>Entry is free.</strong> You never pay, stake, deposit or wager anything to take part.
+  There is no buy-in, no pooled player money and no rake. The prize is funded entirely by the
+  studio. Nothing you own is ever held by us.
+</div>
+
+<h2>1. The season</h2>
+<ul>
+  <li>A season runs <strong>seven days</strong>, from Sunday 00:00 Pacific to the following Sunday 00:00 Pacific.</li>
+  <li><strong>Season 1 opens 9 September 2026 at 00:00 Pacific Time.</strong></li>
+  <li>The end of a season is the <em>closing bell</em>. A live countdown is shown in-game.</li>
+</ul>
+
+<h2>2. How standing is decided</h2>
+<p>Standing is decided by play, not by chance. Every component is published here and shown
+in-game as you earn it.</p>
+<table>
+  <tr><th>What you did</th><th>Points</th></tr>
+  <tr><td>Book value of your garden at the closing bell</td><td>1 per 100 Sap</td></tr>
+  <tr><td>Stealing a plant</td><td>10, then 7, 5, 3 for repeats against the <em>same</em> player</td></tr>
+  <tr><td>Tagging a thief carrying a plant</td><td>15</td></tr>
+  <tr><td>Holding a defence (a raider entered your garden and left with nothing)</td><td>12</td></tr>
+  <tr><td>Completing a keeper's mission</td><td>8</td></tr>
+  <tr><td>Holding the village sprint record at the bell</td><td>50</td></tr>
+</table>
+<p>Repeated steals from the same player are worth less each time. This is deliberate: it
+stops two players farming each other and rewards raiding widely.</p>
+<p>Ties are broken by book value, then by player id. Ordering is total and reproducible.</p>
+
+<h2>3. The closing bell</h2>
+<p>At the bell every garden is liquidated. Each plant is valued at ten minutes of what it
+was earning <em>at that exact moment</em>, which includes its size, its mutation, whether it
+was tended, and its sector's market position. Plants that never revealed settle at a
+quarter of base.</p>
+<p>Market movement is generated inside the game. It does not track, reference or derive
+from any real security, price or market feed.</p>
+
+<h2>4. Prize eligibility</h2>
+<p>Anyone can play, and <strong>everyone appears on the public leaderboard</strong>. To be
+eligible for the prize, at the moment of the bell a linked wallet must hold either:</p>
+<ul>
+  <li><strong>100,000 PonsGarden coin</strong>, or</li>
+  <li><strong>100 PONS</strong></li>
+</ul>
+<p>This is a read-only check of public blockchain data. We never take custody, never ask
+you to send or lock anything, and never construct a transaction. Holding is not a purchase
+of entry — entry is free and unconditional; holding determines prize eligibility only.</p>
+
+<h2>5. The prize</h2>
+<table>
+  <tr><th>Place</th><th>Share of pot</th></tr>
+  <tr><td>1st</td><td>50%</td></tr>
+  <tr><td>2nd</td><td>30%</td></tr>
+  <tr><td>3rd</td><td>20%</td></tr>
+</table>
+<ul>
+  <li>The pot is <strong>100 USD equivalent, paid in PONS</strong>, funded from studio revenue.</li>
+  <li>The PONS quantity is fixed from the reference price <strong>at the moment of the closing
+      bell</strong>, and the source used is recorded in the prize ledger for that season.</li>
+  <li>Winners are fixed by the game at the bell and cannot change afterwards.</li>
+  <li>Payment is made manually to the linked wallet, normally within 7 days of the bell.</li>
+  <li>If fewer than three eligible players finish a season, only the places reached are paid.</li>
+</ul>
+
+<h2>6. What you keep, and what resets</h2>
+<p>At the bell you choose once how to settle your book:</p>
+<ul>
+  <li><strong>Carry</strong> — take it as Sap into next season.</li>
+  <li><strong>Endowment</strong> — convert it into a permanent Sap-per-second trickle, at a
+      deliberately poor rate, that never stops and stacks across seasons.</li>
+  <li><strong>Vintage</strong> — burn it on a cosmetic plant stamped with the season number,
+      whose tier scales with the spend, which can never be grown again.</li>
+</ul>
+<p>Plants clear at the bell. Sap, plots, defences, cosmetics, vintages, endowments, your
+conviction tree and your records all carry forward.</p>
+<div class="box">
+  <strong>Sap is not money.</strong> It is not convertible, redeemable, bridgeable or
+  withdrawable, and there is no rate at which it becomes PONS or anything else. The prize is
+  a fixed amount awarded by rank — never an exchange of in-game progress for value.
+</div>
+
+<h2>7. Fair play</h2>
+<p>We may void a score or exclude an account for automation, exploiting a defect, operating
+multiple accounts to influence standing, or interfering with other players' access. Where a
+defect affects standings we will say so publicly and, if a season is compromised, rerun or
+void it rather than pay out a result we cannot stand behind.</p>
+<p>Stealing plants from other players is not cheating. It is the game.</p>
+
+<h2>8. Changes, and getting in touch</h2>
+<p>Rules may change between seasons, never during one. The version in force when a season
+opens governs that season. Questions and disputes: the contact address on
+<a href="https://prometheus7.com">prometheus7.com</a>.</p>
+
+<footer>
+  Pons Garden is a game. It is not an investment, and nothing here is financial advice.
+  Plant names are parody and imply no affiliation with, endorsement by, or connection to any
+  real company. See the <a href="/ponsgarden/terms.html">Terms</a> and
+  <a href="/ponsgarden/privacy.html">Privacy Notice</a>.
+</footer>
+
+</main></body>
+</html>

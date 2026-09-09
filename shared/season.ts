@@ -211,3 +211,87 @@ export function standings(
     prizeRank: r.eligible && prizeRank < PRIZE_SPLIT.length ? ++prizeRank : 0,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Player profiles - what persists across seasons
+// ---------------------------------------------------------------------------
+
+/** One archived season on a player's record. Written once, at the bell, then immutable. */
+export interface SeasonRecord {
+  season: number;
+  score: number;
+  bookValue: number;
+  rank: number;
+  prizeRank: number;          // 0 unless they finished in the money
+  settlement: Settlement | null;
+  vintage: Tier | null;
+  endedAt: number;
+}
+
+export interface PlayerProfile {
+  currentSeason: number;
+  tally: SeasonTally;
+  /** Permanent Sap/sec accumulated from past endowment settlements. Never decays. */
+  endowment: number;
+  vintages: { season: number; tier: Tier }[];
+  history: SeasonRecord[];
+  lifetime: { steals: number; tags: number; defenses: number; missions: number; seasonsPlayed: number; bestRank: number };
+  /** Season number already settled. The guard against double-settlement on reconnect. */
+  settledSeason: number;
+}
+
+export const emptyProfile = (season: number): PlayerProfile => ({
+  currentSeason: season,
+  tally: emptyTally(),
+  endowment: 0,
+  vintages: [],
+  history: [],
+  lifetime: { steals: 0, tags: 0, defenses: 0, missions: 0, seasonsPlayed: 0, bestRank: 0 },
+  settledSeason: 0,
+});
+
+/**
+ * Roll a profile forward when the season changes. Archiving is the caller's job (it needs
+ * standings); this only resets the per-season tally and moves lifetime counters across, so
+ * a player who was offline through a whole bell still comes back to a coherent record.
+ */
+export function rollSeason(p: PlayerProfile, season: number): PlayerProfile {
+  if (p.currentSeason === season) return p;
+  const t = p.tally;
+  return {
+    ...p,
+    currentSeason: season,
+    tally: emptyTally(),
+    lifetime: {
+      steals: p.lifetime.steals + Object.values(t.stealsByVictim).reduce((a, b) => a + b, 0),
+      tags: p.lifetime.tags + t.tags,
+      defenses: p.lifetime.defenses + t.defensesHeld,
+      missions: p.lifetime.missions + t.missions,
+      seasonsPlayed: p.lifetime.seasonsPlayed + 1,
+      bestRank: p.lifetime.bestRank,
+    },
+  };
+}
+
+/** Apply a settled season to the profile. Idempotent: a repeat call is a no-op. */
+export function applySettlement(
+  p: PlayerProfile,
+  record: SeasonRecord,
+  result: SettlementResult,
+): { profile: PlayerProfile; sapAwarded: number } {
+  if (p.settledSeason >= record.season) return { profile: p, sapAwarded: 0 };
+  return {
+    profile: {
+      ...p,
+      settledSeason: record.season,
+      endowment: Math.round((p.endowment + result.endowment) * 100) / 100,
+      vintages: result.vintage ? [...p.vintages, { season: record.season, tier: result.vintage }] : p.vintages,
+      history: [...p.history, record],
+      lifetime: {
+        ...p.lifetime,
+        bestRank: p.lifetime.bestRank === 0 ? record.rank : Math.min(p.lifetime.bestRank, record.rank),
+      },
+    },
+    sapAwarded: result.sap,
+  };
+}

@@ -170,3 +170,109 @@ test('prize split sums to exactly one', () => {
   assert.equal(PRIZE_SPLIT.reduce((a, b) => a + b, 0), 1);
   assert.equal(PRIZE_SPLIT.length, 3);
 });
+
+// --- the bell, profiles and the ledger --------------------------------------------------
+
+import { runBell, currentProfile, recordSteal, recordTag, recordMission, writeLedgerRow, readLedger, dueBellSeason, POT_USD, type BellPlayer } from '../season';
+import { emptyProfile, applySettlement, rollSeason } from '../../../shared/season';
+import fs from 'node:fs';
+import os from 'node:os';
+import pathMod from 'node:path';
+
+const bellPlayer = (id: string, over: Partial<BellPlayer> = {}): BellPlayer => ({
+  id, name: id.toUpperCase(), plots: [plant('circuit_sequoia')],
+  profile: emptyProfile(1), ponsGarden: 0, pons: 0, ...over,
+});
+
+test('the bell ranks, settles and reports payouts without moving value', () => {
+  const bell = SEASON_ONE_START_MS + SEASON_LENGTH_MS;
+  const rich = bellPlayer('rich', { pons: 500, plots: [plant('circuit_sequoia'), plant('circuit_sequoia')] });
+  const mid = bellPlayer('mid', { ponsGarden: 200_000 });
+  const guest = bellPlayer('guest', { plots: [plant('the_index')] });   // ineligible
+  const r = runBell([rich, mid, guest], 1, bell, (id) => ROSTER.find((s) => s.id === id));
+
+  assert.equal(r.season, 1);
+  assert.equal(r.standings.length, 3);
+  assert.ok(r.standings.every((s) => s.rank > 0));
+  // The ineligible guest still ranks publicly but is never paid.
+  assert.equal(r.standings.find((s) => s.playerId === 'guest')!.prizeRank, 0);
+  assert.ok(r.payouts.every((p) => p.playerId !== 'guest'));
+  assert.equal(r.payouts.reduce((a, p) => a + p.share, 0), 1 - (3 - r.payouts.length) * 0 - (r.payouts.length < 3 ? PRIZE_SPLIT.slice(r.payouts.length).reduce((a, b) => a + b, 0) : 0));
+  // Default settlement is carry, so everyone's book comes back as Sap.
+  for (const s of r.standings) assert.equal(r.sapAwards[s.playerId], s.bookValue);
+});
+
+test('the bell is idempotent - replaying it cannot pay a player twice', () => {
+  const bell = SEASON_ONE_START_MS + SEASON_LENGTH_MS;
+  const p = bellPlayer('solo', { pons: 500 });
+  const first = runBell([p], 1, bell, (id) => ROSTER.find((s) => s.id === id));
+  assert.ok(first.sapAwards.solo > 0);
+  // Feed the settled profile back in and run the same season again.
+  const again = runBell([{ ...p, profile: first.profiles.solo }], 1, bell, (id) => ROSTER.find((s) => s.id === id));
+  assert.equal(again.sapAwards.solo, 0, 'a replayed bell must award nothing');
+  assert.equal(again.profiles.solo.history.length, 1, 'history must not gain a duplicate row');
+});
+
+test('settlement choices route the book correctly at the bell', () => {
+  const bell = SEASON_ONE_START_MS + SEASON_LENGTH_MS;
+  const mk = (s: 'carry' | 'endowment' | 'vintage') =>
+    runBell([bellPlayer('x', { pons: 500, settlement: s })], 1, bell, (id) => ROSTER.find((i) => i.id === id));
+  assert.ok(mk('carry').sapAwards.x > 0);
+  assert.equal(mk('endowment').sapAwards.x, 0);
+  assert.ok(mk('endowment').profiles.x.endowment > 0);
+  assert.equal(mk('vintage').sapAwards.x, 0);
+  assert.equal(mk('vintage').profiles.x.vintages.length, 1);
+});
+
+test('profiles roll across seasons and keep lifetime counters', () => {
+  let p = emptyProfile(1);
+  p = recordSteal(p, 'marla'); p = recordSteal(p, 'marla'); p = recordTag(p); p = recordMission(p);
+  const rolled = rollSeason(p, 2);
+  assert.equal(rolled.currentSeason, 2);
+  assert.deepEqual(rolled.tally.stealsByVictim, {}, 'per-season tally resets');
+  assert.equal(rolled.lifetime.steals, 2);
+  assert.equal(rolled.lifetime.tags, 1);
+  assert.equal(rolled.lifetime.missions, 1);
+  assert.equal(rolled.lifetime.seasonsPlayed, 1);
+  assert.equal(rollSeason(rolled, 2), rolled, 'rolling to the same season is a no-op');
+});
+
+test('currentProfile creates and rolls without losing history', () => {
+  const before = currentProfile(undefined, SEASON_ONE_START_MS);
+  assert.equal(before.currentSeason, 1);
+  const later = currentProfile(before, SEASON_ONE_START_MS + SEASON_LENGTH_MS);
+  assert.equal(later.currentSeason, 2);
+});
+
+test('the prize ledger records winners and leaves payment fields blank', () => {
+  const dir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'pons-ledger-'));
+  const bell = SEASON_ONE_START_MS + SEASON_LENGTH_MS;
+  const r = runBell(
+    [bellPlayer('a', { pons: 500 }), bellPlayer('b', { pons: 500 }), bellPlayer('c', { pons: 500 })],
+    1, bell, (id) => ROSTER.find((s) => s.id === id),
+  );
+  const row = writeLedgerRow(dir, r);
+  assert.equal(row.potUsd, POT_USD);
+  assert.equal(row.winners.length, 3);
+  assert.equal(row.winners.reduce((a, w) => a + w.usd, 0), POT_USD);
+  // The game fixes WHO won; it never fixes or moves what they are paid.
+  for (const w of row.winners) {
+    assert.equal(w.ponsAmount, null);
+    assert.equal(w.txHash, null);
+  }
+  assert.equal(row.referencePriceUsd, null);
+  assert.equal(row.paidAt, null);
+  // Appending is additive and re-readable.
+  writeLedgerRow(dir, { ...r, season: 2 });
+  assert.deepEqual(readLedger(dir).map((x) => x.season), [1, 2]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('bells are owed strictly in order and never collapse', () => {
+  const during1 = SEASON_ONE_START_MS + 1000;
+  const during3 = SEASON_ONE_START_MS + 2 * SEASON_LENGTH_MS + 1000;
+  assert.equal(dueBellSeason(0, during1), 0, 'season 1 still running');
+  assert.equal(dueBellSeason(0, during3), 1, 'catch up from the oldest first');
+  assert.equal(dueBellSeason(1, during3), 2);
+  assert.equal(dueBellSeason(2, during3), 0, 'nothing owed once caught up');
+});
