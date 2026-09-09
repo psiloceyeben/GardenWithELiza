@@ -1,11 +1,11 @@
-import { resolveRoster } from '@shared/roster';
+import { resolveRoster, migrateSpeciesId } from '@shared/roster';
 import copyJson from '@content/copy.json';
 import type { Species, Tier, MutationId } from '@shared/types';
 
 export const ROSTER: Species[] = resolveRoster(import.meta.env.VITE_PONS_ROSTER);
 const byId = new Map(ROSTER.map((s) => [s.id, s]));
 export const speciesById = (id: string): Species => {
-  const s = byId.get(id);
+  const s = byId.get(migrateSpeciesId(id));
   if (!s) throw new Error(`unknown species ${id}`);
   return s;
 };

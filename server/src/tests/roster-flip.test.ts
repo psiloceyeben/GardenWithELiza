@@ -94,5 +94,49 @@ check('ids leak nothing: no id contains a market name or ticker', () => {
   }
 });
 
+// --- legacy migration: live gardens must survive the roster change --------------------
+
+import { LEGACY_SPECIES, migrateSpeciesId } from "../../../shared/roster";
+import { speciesById, findSpecies } from '../roster';
+
+check('every legacy species id maps to a species that exists', () => {
+  const ids = new Set(SPECIES_IDS);
+  for (const [legacy, current] of Object.entries(LEGACY_SPECIES)) {
+    assert(ids.has(current), `legacy ${legacy} maps to missing species ${current}`);
+  }
+});
+
+check('legacy mappings preserve tier - no garden gains or loses value', () => {
+  const legacyTiers: Record<string, string> = {
+    gorbulon_sprig: 'common', plain_gerald: 'common', bogwort: 'common', concerned_radish: 'common',
+    weeping_wumbus: 'uncommon', clammy_pete: 'uncommon', low_ambition_tulip: 'uncommon', corn_that_knows: 'uncommon',
+    unlicensed_carrot: 'rare', pumpkin_esquire: 'rare', bartholomew_bean: 'rare', sunflower_who_lied: 'rare', melonhound: 'rare',
+    sir_blombus: 'epic', duchess_turnip: 'epic', grabby_bertrand: 'epic', pineapple_enforcer: 'epic', cactusberry_vicar: 'epic',
+    fraudulent_orchid: 'legendary', lord_eggplant: 'legendary', bamboo_inspector: 'legendary',
+    yelling_tuber: 'mythic',
+  };
+  const market = resolveRoster('market');
+  for (const [legacy, wantTier] of Object.entries(legacyTiers)) {
+    const mapped = LEGACY_SPECIES[legacy];
+    assert(!!mapped, `no mapping for legacy species ${legacy}`);
+    const sp = market.find((s) => s.id === mapped)!;
+    assert(sp.tier === wantTier, `${legacy} (${wantTier}) maps to ${mapped} (${sp.tier}) - tier changed`);
+  }
+});
+
+check('a saved legacy plant still resolves through the live lookups', () => {
+  for (const legacy of Object.keys(LEGACY_SPECIES)) {
+    const s = speciesById(legacy);          // must not throw
+    assert(!!s && !!s.ticker, `legacy ${legacy} did not resolve`);
+    assert(findSpecies(legacy)?.id === LEGACY_SPECIES[legacy], `findSpecies disagrees for ${legacy}`);
+  }
+});
+
+check('unknown ids pass through migration unchanged rather than being remapped', () => {
+  assert(migrateSpeciesId('husk_holdings') === 'husk_holdings', 'current id must not be remapped');
+  assert(migrateSpeciesId('nonsense') === 'nonsense', 'unknown id must pass through');
+});
+
+// Exit check MUST stay last: every check above it contributes to `failures`.
 if (failures) { console.error(`roster-flip: ${failures} failure(s)`); process.exit(1); }
 console.log('roster-flip: all passed');

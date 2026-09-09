@@ -41,7 +41,12 @@ walkDir(path.join(root, 'client/src'), ['.ts', '.html'], (p) => {
   const lits = src.match(/(['"`])(?:(?!\1)[^\\]|\\.)*\1/g) || [];
   lits.forEach((l) => checkString(l.slice(1, -1), path.relative(root, p)));
 });
-walkDir(path.join(root, 'client'), ['.html'], (p) => checkString(fs.readFileSync(p, 'utf8'), path.relative(root, p)));
+// Legal pages are EXEMPT by design. I-4 bans INDUCEMENT copy in player-facing game UI;
+// these pages exist to state the negations - "nothing is wagered", "not redeemable",
+// "not withdrawable". Banning the words here would make it impossible to disclaim them.
+// Game copy, content and lore remain fully covered above.
+const LEGAL_PAGES = new Set(['rules.html', 'terms.html', 'privacy.html']);
+walkDir(path.join(root, 'client'), ['.html'], (p) => { if (LEGAL_PAGES.has(path.basename(p))) return; checkString(fs.readFileSync(p, 'utf8'), path.relative(root, p)); });
 
 if (hits.length) {
   console.error(`BANNED COPY: ${hits.length} hit(s)`);

@@ -108,3 +108,36 @@ export function assertFlipSafe(): void {
     }
   }
 }
+
+/**
+ * Legacy species ids from the pre-2026-09-08 nineteen-species roster, mapped onto the
+ * thirty-species board. Saved gardens predate the market roster, and a player who logs in
+ * after the switch must find their plants intact rather than gone.
+ *
+ * Every mapping is TIER-PRESERVING: a rare stays rare, so nobody's garden gains or loses
+ * value across the migration and no season standing is distorted by it.
+ */
+export const LEGACY_SPECIES: Readonly<Record<string, string>> = {
+  // common
+  gorbulon_sprig: 'husk_holdings', plain_gerald: 'moonwort',
+  bogwort: 'bagholly', concerned_radish: 'pennysprout',
+  // uncommon
+  weeping_wumbus: 'fernance_brothers', clammy_pete: 'voltvine',
+  low_ambition_tulip: 'ticker_tulip', corn_that_knows: 'panopticus_palm',
+  // rare
+  unlicensed_carrot: 'divvy_fig', pumpkin_esquire: 'bullrush',
+  bartholomew_bean: 'middling_mills', sunflower_who_lied: 'everbloom',
+  melonhound: 'orchard_prime',
+  // epic
+  sir_blombus: 'beargonia', duchess_turnip: 'aunt_hazels',
+  grabby_bertrand: 'mahogany_board', pineapple_enforcer: 'cornerstone_cactus',
+  cactusberry_vicar: 'custodian_cypress',
+  // legendary
+  fraudulent_orchid: 'circuit_sequoia', lord_eggplant: 'blue_chip_oak',
+  bamboo_inspector: 'trillion_thistle',
+  // mythic
+  yelling_tuber: 'the_index',
+};
+
+/** Resolve a possibly-legacy species id to a current one. Unknown ids pass through. */
+export const migrateSpeciesId = (id: string): string => LEGACY_SPECIES[id] ?? id;

@@ -17,9 +17,13 @@ import { Life } from './life';
 import * as Oracle from './oracle';
 import { NPCS, MISSIONS, MISSION_MAX_ACTIVE, npcById, type MissionKind, type MissionView } from '../../shared/missions';
 import { ROSTER } from './roster';
+import { LEGACY_SPECIES } from '../../shared/roster';
 import copyJson from '../../content/copy.json';
 
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
+// Saved gardens predate the thirty-species board. Alias legacy ids into the same map so
+// every existing lookup keeps working with no data rewrite. Mappings are tier-preserving.
+for (const [legacy, current] of Object.entries(LEGACY_SPECIES)) { const s = SP.get(current); if (s) SP.set(legacy, s); }
 const MUT = copyJson.mutations as Record<string, string>;
 const UI = copyJson.ui as Record<string, string>;
 const DEFAULT_PLOTS = 10; // Ben 2026-09-07: ten empty plots to start; existing players are raised to this on login (land never shrinks)

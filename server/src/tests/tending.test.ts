@@ -45,7 +45,10 @@ test('reachable planting, watering and tending are single-use within their coold
     const before=rec.sap;
     await game.handle(live,{t:'tend',plotId:0});
     timestamp=plant.lastWeeded;sap=rec.sap;
-    assert(timestamp>0);assert.equal(sap-before,30);
+    assert(timestamp>0);
+    // Weeding pays WEED_BONUS_SEC of the plant's CURRENT output, so the market moves it.
+    // Common tier swings +/-60% (shared/market.ts), hence a band rather than a fixed 30.
+    const gained=sap-before;assert(gained>=12&&gained<=48,`weed bonus ${gained} outside the published common-tier band`);
     await game.handle(live,{t:'tend',plotId:0});assert.equal(rec.sap,sap);assert.equal(plant.lastWeeded,timestamp);
   }finally{await game.store.close();}
   const reopened=new Game(directory);await reopened.initialize();

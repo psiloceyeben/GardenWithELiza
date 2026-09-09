@@ -7,9 +7,13 @@ import * as E from '../../shared/economy';
 import { uid } from '../../shared/rng';
 import { isWalkableTile, lotAtPx, tileAt, T, TILE, VILLAGE_W, VILLAGE_H, type Village } from '../../shared/world';
 import { ROSTER } from './roster';
+import { LEGACY_SPECIES } from '../../shared/roster';
 import copyJson from '../../content/copy.json';
 
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
+// Saved gardens predate the thirty-species board. Alias legacy ids into the same map so
+// every existing lookup keeps working with no data rewrite. Mappings are tier-preserving.
+for (const [legacy, current] of Object.entries(LEGACY_SPECIES)) { const s = SP.get(current); if (s) SP.set(legacy, s); }
 const UI = copyJson.ui as Record<string, string>;
 const EVENT_ORDER: EventKind[] = ['seed_rain', 'screaming_hour', 'golden_hour'];
 const SPAWN_MS = Number(process.env.PONS_WILD_SPAWN_MS ?? P.WILD_SPAWN_MS);
