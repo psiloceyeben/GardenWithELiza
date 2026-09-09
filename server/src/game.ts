@@ -4,7 +4,7 @@ import type { GameState, Plant, Seed, Tier, ConveyorSlot } from '../../shared/ty
 import * as E from '../../shared/economy';
 import { gnomePatrol } from '../../shared/gnome-patrol';
 import { mulberry32, randomSeed, uid } from '../../shared/rng';
-import { buildVillage, lotAtPx, lotGatePx, moveActor, TILE, BIOME_NAMES, LOTS_PER_VILLAGE, type Village, type Lot } from '../../shared/world';
+import { buildVillage, openLotCount, lotAtPx, lotGatePx, moveActor, TILE, BIOME_NAMES, LOTS_PER_VILLAGE, type Village, type Lot } from '../../shared/world';
 import * as P from '../../shared/protocol';
 import type { ClientMsg, ServerMsg, PrivateState, PublicLot, SnapPlayer, Defenses, FeedEvent, Dir } from '../../shared/protocol';
 import { Store } from './store';
@@ -420,10 +420,16 @@ export class Game {
   }
 
   newPlayer(id: string, secret: string, name: string, save: GameState | null, now: number): PlayerRec {
+    // Open more ground as registrations arrive. The map always holds LOTS_PER_VILLAGE lots;
+    // how many GATES are open tracks the player count, so the village stays walkable rather
+    // than becoming a field of empty gardens nobody can be bothered to raid.
+    const want = Math.min(LOT_CAP, openLotCount(this.players.size + 1));
+    for (const v of this.villages.values()) while (v.lots.length < want) v.lots.push(null);
+
     // find a village with a free lot
     let village = [...this.villages.values()].find((v) => v.lots.some((x) => !x));
     if (!village) {
-      village = { id: `v${this.nextVillage}`, seed: (randomSeed() % 100000) + this.nextVillage * 7, lots: Array(LOT_CAP).fill(null), n: this.nextVillage };
+      village = { id: `v${this.nextVillage}`, seed: (randomSeed() % 100000) + this.nextVillage * 7, lots: Array(want).fill(null), n: this.nextVillage };
       this.nextVillage += 1; this.villages.set(village.id, village); this.maps.set(village.id, buildVillage(village.seed));
     }
     const lotId = village.lots.findIndex((x) => !x);

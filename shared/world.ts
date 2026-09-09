@@ -3,9 +3,12 @@
 import { mulberry32 } from './rng';
 
 export const TILE = 32;
-export const VILLAGE_W = 120;
-export const VILLAGE_H = 80;
-export const LOTS_PER_VILLAGE = 16;
+// Expanded 2026-09-09 for launch: ~3x the ground and 3x the lots. The original core (town,
+// plaza, ring roads, first sixteen lots) keeps its exact coordinates - everything new is
+// added in the ground to the east and south, so the hand-placed centre is untouched.
+export const VILLAGE_W = 208;
+export const VILLAGE_H = 140;
+export const LOTS_PER_VILLAGE = 48;
 export const LOT_W = 13;   // including fence ring
 export const LOT_H = 11;
 export const MAX_PLOTS = 20;
@@ -115,6 +118,28 @@ export function buildVillage(seed: number): Village {
   for (const y of [12, 26, 40, 54]) addLot(8, y, 'right');
   for (const y of [12, 26, 40, 54]) addLot(98, y, 'left');
 
+  // --- expansion, 2026-09-09 -------------------------------------------------------
+  // Roads first so the new ground is connected rather than a field of islands, then two
+  // more bands of lots. Order matters: addLot paints over whatever the roads laid down.
+  fill(112, 10, 2, 118, T.path);          // the east avenue
+  fill(23, 70, 160, 2, T.path);           // the south road, spanning old ground and new
+  fill(23, 100, 160, 2, T.path);          // the far south road
+  fill(150, 10, 2, 118, T.path);          // second north-south, out east
+  fill(112, 24, 74, 2, T.path);           // east cross-street, level with the old ring
+  fill(59, 100, 2, 28, T.path);           // spur down from the plaza spokes
+
+  // East band: sixteen lots either side of the east avenue.
+  for (const y of [12, 26, 40, 54]) addLot(120, y, 'left');
+  for (const y of [12, 26, 40, 54]) addLot(136, y, 'right');
+  for (const y of [12, 26, 40, 54]) addLot(158, y, 'left');
+  for (const y of [12, 26, 40, 54]) addLot(174, y, 'right');
+
+  // South band: sixteen more below the old ring, reached from the south roads.
+  for (const x of [30, 46, 62, 78]) addLot(x, 76, 'top');
+  for (const x of [30, 46, 62, 78]) addLot(x, 104, 'bottom');
+  for (const x of [120, 136, 158, 174]) addLot(x, 76, 'top');
+  for (const x of [120, 136, 158, 174]) addLot(x, 104, 'bottom');
+
   // props
   const props: Prop[] = [];
   const conveyor = { tx: 59, ty: 33 };
@@ -216,4 +241,23 @@ export function findPath(v: Village, from: { x: number; y: number }, to: { x: nu
   const out: { x: number; y: number }[] = [];
   for (let c = goal; c !== start; c = prev[c]) { const cx = c % VILLAGE_W; out.push({ x: cx * TILE + 16, y: ((c - cx) / VILLAGE_W) * TILE + 16 }); }
   out.reverse(); out[out.length - 1] = to; return out;
+}
+
+/**
+ * How many lots are OPEN for assignment, given how many players have registered.
+ *
+ * The village is built for 48, but a village of 48 lots holding six players reads as
+ * abandoned - empty gardens with nobody to steal from is the worst version of this game.
+ * So the ground exists from the start and the gates open as people arrive, keeping
+ * neighbours within walking distance of each other.
+ *
+ * Headroom is deliberate: always more open lots than players, so somebody joining right
+ * now always has somewhere to go and never waits for a slot.
+ */
+export const LOT_BASE = 16;
+export const LOT_HEADROOM = 1.4;
+
+export function openLotCount(registeredPlayers: number): number {
+  const wanted = Math.ceil(Math.max(0, registeredPlayers) * LOT_HEADROOM);
+  return Math.max(LOT_BASE, Math.min(LOTS_PER_VILLAGE, wanted));
 }
