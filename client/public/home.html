@@ -35,6 +35,7 @@
   .bar nav{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12px}
   .bar nav a{color:#e8d3ac;text-decoration:none}
   .bar nav a:hover{text-decoration:underline}
+  .eliza{color:#d3b98d;white-space:nowrap;letter-spacing:.5px}
   .online{color:#d8f0b8;white-space:nowrap}
   .online b{color:#fff}
   .enter{background:var(--green);color:#fff;padding:8px 16px;border:2px solid #24410f;
@@ -48,6 +49,7 @@
   .tk{flex:none;letter-spacing:.5px}
   .up{color:#8cd25a}.down{color:#e57a63}.flat{color:#9d8b70}
   @keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media (max-width:820px){.eliza{display:none}}
 
   /* ---- hero ---- */
   .hero{padding:58px 0 44px;text-align:center;background:
@@ -141,6 +143,7 @@
       PONS GARDEN
     </span>
     <nav>
+      <span class="eliza">built with the help of ELIZA</span>
       <span class="online"><b id="online">—</b> in the village</span>
       <a href="#how">How to play</a>
       <a href="/rules.html">Rules</a>
@@ -252,17 +255,17 @@
   <table>
     <tr><th>Tier</th><th>Grows in</th><th>Pays</th><th>Swings</th><th>Examples</th></tr>
     <tr><td class="t-common">Penny</td><td>30 s</td><td>1/sec</td><td>±60%</td>
-        <td><span class="tick">GME</span> GAMESTOPplant · <span class="tick">AMC</span> AMCplant</td></tr>
+        <td><span class="tick">HUSK</span> Husk Holdings · <span class="tick">RUGG</span> Rugg Capital</td></tr>
     <tr><td class="t-uncommon">Small Cap</td><td>1 min</td><td>3/sec</td><td>±60%</td>
-        <td><span class="tick">HOOD</span> ROBINHOODplant · <span class="tick">PLTR</span> PALANTIRplant</td></tr>
+        <td><span class="tick">FRNC</span> Fernance Brothers · <span class="tick">PNPT</span> Panopticus Palm</td></tr>
     <tr><td class="t-rare">Mid Cap</td><td>2 min</td><td>9/sec</td><td>±25%</td>
-        <td><span class="tick">SBUX</span> STARBUCKSplant · <span class="tick">F</span> FORDplant</td></tr>
+        <td><span class="tick">DIVI</span> Divvy Fig · <span class="tick">BULL</span> Bullrush</td></tr>
     <tr><td class="t-epic">Blue Chip</td><td>4 min</td><td>27/sec</td><td>±8%</td>
-        <td><span class="tick">JPM</span> JPMORGANplant · <span class="tick">DIS</span> DISNEYplant</td></tr>
+        <td><span class="tick">BEAR</span> Beargonia · <span class="tick">BORD</span> Mahogany Board</td></tr>
     <tr><td class="t-legendary">Megacap</td><td>8 min</td><td>81/sec</td><td>±8%</td>
-        <td><span class="tick">NVDA</span> NVIDIAplant · <span class="tick">TSLA</span> TESLAplant</td></tr>
+        <td><span class="tick">CRCT</span> Circuit Sequoia · <span class="tick">TRIL</span> Trillion Thistle</td></tr>
     <tr><td class="t-mythic">Index</td><td>15 min</td><td>243/sec</td><td>±8%</td>
-        <td><span class="tick">SPY</span> SP500plant · <span class="tick">BRK</span> BERKSHIREplant</td></tr>
+        <td><span class="tick">NDEX</span> The Index · <span class="tick">HEDG</span> The Hedgeaway</td></tr>
   </table>
   <div class="note"><b>Volatility moves by sector.</b> When semiconductors rip, every semi plant
     in the village spikes at once and the whole plaza runs at the two gardens holding them. A
@@ -327,7 +330,6 @@
     <tr><td>Total time held</td><td>A conviction tree growing in your corner</td></tr>
     <tr><td>Each large past sell</td><td>A permanent stump on your fence, visible to every visitor</td></tr>
   </table>
-  <div class="ca"><b>CA</b><span id="ca">TBA — contract address will be posted here at launch</span></div>
   <div class="note">Conviction is landscape. You cannot buy it, fake it or clear it — and
     everyone who walks past your gate can read it.</div>
 </div></section>
@@ -408,14 +410,14 @@
   // species per row of 13 frames (5 grow, 6 idle, 2 wither) at 32x48. So row = index and
   // the idle frames start at column 5. Rendered at 2x, hence the 832x2880 background size.
   const FLORA = [
-    ['GAMESTOPplant','GME'],['AMCplant','AMC'],['NIKOLAplant','NKLA'],['WEWORKplant','WE'],
-    ['PELOTONplant','PTON'],['ROBINHOODplant','HOOD'],['PALANTIRplant','PLTR'],['RIVIANplant','RIVN'],
-    ['SNAPplant','SNAP'],['CHEWYplant','CHWY'],['STARBUCKSplant','SBUX'],['FORDplant','F'],
-    ['PFIZERplant','PFE'],['KROGERplant','KR'],['UPSplant','UPS'],['JPMORGANplant','JPM'],
-    ['COCACOLAplant','KO'],['DISNEYplant','DIS'],['WALMARTplant','WMT'],['JOHNSONplant','JNJ'],
-    ['NVIDIAplant','NVDA'],['APPLEplant','AAPL'],['TESLAplant','TSLA'],['AMAZONplant','AMZN'],
-    ['MICROSOFTplant','MSFT'],['SP500plant','SPY'],['VANGUARDplant','VOO'],['NASDAQplant','QQQ'],
-    ['BERKSHIREplant','BRK'],['GOLDplant','GLD'],
+    ['Husk Holdings','HUSK'],['Rugg Capital','RUGG'],['Moonwort Ventures','MOON'],['Bagholly & Co.','BAGZ'],
+    ['Pennysprout','PNNY'],['Fernance Brothers','FRNC'],['Panopticus Palm','PNPT'],['Voltvine','VOLT'],
+    ['Ticker Tulip','TCKR'],['Sprout & Sons','SPRT'],['Divvy Fig','DIVI'],['Bullrush','BULL'],
+    ['Everbloom Pharma','EVBL'],['Middling Mills','MIDL'],['Orchard Prime','PRME'],['Beargonia','BEAR'],
+    ["Aunt Hazel's",'HZEL'],['Mahogany Board','BORD'],['Cornerstone Cactus','CNRS'],['Custodian Cypress','CSTD'],
+    ['Circuit Sequoia','CRCT'],['Blue Chip Oak','OAKX'],['Trillion Thistle','TRIL'],['The Orchard Giant','GIAN'],
+    ['Softwood Systems','SOFT'],['The Index','NDEX'],['Steady Eddy Trust','TRST'],['The Short Squeeze','SQZE'],
+    ['The Hedgeaway','HEDG'],['Goldenrod Reserve','GOLD'],
   ];
   const flora = document.getElementById('flora');
   if (flora) {
