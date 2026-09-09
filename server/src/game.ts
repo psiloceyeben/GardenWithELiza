@@ -158,12 +158,24 @@ export class Game {
   map(rec: PlayerRec): Village { return this.maps.get(this.vid(rec))!; }
   lot(rec: PlayerRec): Lot { return this.homeMap(rec).lots[rec.lotId]; }
   isShielded(rec: PlayerRec, now: number): boolean { const l = this.live.get(rec.id); return !l || now < l.shieldUntil; }
-  gateClosedFn(villageId: string): (tx: number, ty: number) => boolean {
+  /**
+   * Is this gate shut for the player who is trying to walk through it?
+   *
+   * `forPlayerId` matters: a fence is a defence against NEIGHBOURS. Without it, buying a
+   * fence locked the owner out of their own garden, which is the least useful thing a
+   * purchase has ever done.
+   */
+  gateClosedFn(villageId: string, forPlayerId?: string): (tx: number, ty: number) => boolean {
     const v = this.villages.get(villageId)!; const m = this.maps.get(villageId)!;
     return (tx, ty) => {
       for (let i = 0; i < m.lots.length; i++) {
         const l = m.lots[i];
-        if (l.gate.tx === tx && l.gate.ty === ty) { const o = v.lots[i]; const rec = o ? this.players.get(o) : null; return !!rec && rec.defenses.gateHp > 0; }
+        if (l.gate.tx === tx && l.gate.ty === ty) {
+          const o = v.lots[i];
+          if (o && o === forPlayerId) return false;   // your own gate always opens for you
+          const rec = o ? this.players.get(o) : null;
+          return !!rec && rec.defenses.gateHp > 0;
+        }
       }
       return false;
     };
@@ -622,7 +634,7 @@ export class Game {
     const dist = Math.hypot(x - l.x, y - l.y);
     if (budget.take(dist, this.speedOf(l, rec, now), now)) {
       // accept the client's predicted position only if the path is walkable (collision re-check)
-      const gc = this.gateClosedFn(this.vid(rec));
+      const gc = this.gateClosedFn(this.vid(rec), rec.id);
       const r = moveActor(this.map(rec), l.x, l.y, x - l.x, y - l.y, gc);
       l.x = r.x; l.y = r.y;
     }

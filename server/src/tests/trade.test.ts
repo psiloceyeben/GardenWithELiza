@@ -116,3 +116,28 @@ test('the feed line reads like a sentence', () => {
   const line = describeTrade(t, (id) => (id === 'alice' ? 'Marla' : 'Nix'));
   assert.equal(line, 'Marla traded 1 plant for 2 seeds + 300 Sap with Nix');
 });
+
+// --- gates ---------------------------------------------------------------------------
+// A fence is a defence against neighbours. Buying one used to lock the owner out of their
+// own garden, which is the least useful thing a purchase has ever done.
+
+test('a closed gate opens for its owner and nobody else', () => {
+  const lots = [
+    { ownerId: 'alice', gate: { tx: 10, ty: 20 }, gateHp: 3 },
+    { ownerId: 'bob', gate: { tx: 30, ty: 40 }, gateHp: 0 },
+  ];
+  // The shape both the server and the two client renderers implement.
+  const closedFor = (viewerId: string) => (tx: number, ty: number): boolean => {
+    for (const l of lots) {
+      if (l.gate.tx === tx && l.gate.ty === ty) {
+        return l.ownerId !== viewerId && l.gateHp > 0;
+      }
+    }
+    return false;
+  };
+
+  assert.equal(closedFor('alice')(10, 20), false, 'the owner walks through their own fence');
+  assert.equal(closedFor('bob')(10, 20), true, 'a neighbour does not');
+  assert.equal(closedFor('alice')(30, 40), false, 'an unfenced gate is open to everyone');
+  assert.equal(closedFor('alice')(99, 99), false, 'a tile with no gate is never closed');
+});

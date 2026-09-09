@@ -472,8 +472,13 @@ export class WorldScene extends Phaser.Scene {
     if (now - this.lastSend >= 100 && (this.moving || this.lastSend === 0 || this.player.getData('dirty'))) { this.lastSend = now; this.player.setData('dirty', false); this.net.send({ t: 'input', dx: this.joy.x, dy: this.joy.y, x: Math.round(this.player.x), y: Math.round(this.player.y), d: this.dir, f: this.flip, m: this.moving }); }
   }
 
+  /** A fence keeps neighbours out, not you. Mirrors the server, which is authoritative. */
   gateClosed = (tx: number, ty: number): boolean => {
-    for (const v of this.lots.values()) if (v.geo.gate.tx === tx && v.geo.gate.ty === ty) return v.lot.defenses.gateHp > 0;
+    for (const v of this.lots.values()) {
+      if (v.geo.gate.tx === tx && v.geo.gate.ty === ty) {
+        return v.lot.ownerId !== this.you?.id && v.lot.defenses.gateHp > 0;
+      }
+    }
     return false;
   };
 

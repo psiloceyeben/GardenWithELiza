@@ -345,11 +345,13 @@ export class WorldState {
         break;
     }
   }
+  /** A fence keeps neighbours out, not you. Mirrors the server, which is authoritative. */
   gateClosed = (tx: number, ty: number): boolean =>
     [...this.lots.values()].some(
       (v) =>
         v.geo.gate.tx === tx &&
         v.geo.gate.ty === ty &&
+        v.lot.ownerId !== this.you?.id &&
         v.lot.defenses.gateHp > 0,
     );
   tick(dt: number, input: { x: number; y: number }): void {
