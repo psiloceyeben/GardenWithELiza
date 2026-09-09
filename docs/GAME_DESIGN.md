@@ -182,6 +182,39 @@ landscape.** You cannot buy it, fake it or clear it.
 anyone appears on the public leaderboard, and the wallet read decides who is eligible for
 the pot. Checked at the closing bell against the same public data as everything else.
 
+## 6a. The daily dividend
+
+Holding pays every day, in the game, at a tree in the plaza.
+
+**The Dividend Fig** stands in the middle of the village. Once a day it has a bead of syrup
+ready for you and you walk over and take it. No popup, no modal, no login-reward screen —
+you go to the tree, the tree does its one proud little animation, and the village sees you
+collect. It is the same character as the Mid Cap *Divvy Fig*, grown enormous, and it is the
+natural meeting point for everyone logging in around the same time.
+
+**What it pays**, scaled by the same holding ladder that sets your plot count:
+
+| Holding band | Plots | Daily dividend |
+|---|---|---|
+| Guest / not held | 10 | Sap only, at the base rate |
+| Held, entry band | 12 | Base Sap + one seed at your rarity floor |
+| 14 | 14 | More Sap + one seed, floor +1 tier |
+| 16 | 16 | More Sap + two seeds |
+| 18 | 18 | More Sap + two seeds + a weekly cosmetic roll |
+| 20 (top band) | 20 | Top Sap + three seeds + the cosmetic roll, and first pick of the day's wild spawns |
+
+**The streak** is what actually brings people back. Consecutive days collected multiply the
+dividend up to a cap over two weeks. Miss a day and it does not reset to zero — it steps
+back a few days, which is the version people forgive. A visible streak counter sits on the
+tree and on your fence sign, so streaks become a village status object like the conviction
+tree.
+
+**Why it works.** It is paid in the things that make your garden better rather than in
+anything convertible, so it needs no rate, no treasury and no obligation. It gives a holder
+a reason to open the game on a day they were not going to. And it lands at a fixed place in
+the world, which turns a retention mechanic into a crowd — and a crowd next to sixteen
+unlocked gardens is the best thing that can happen to a raid game.
+
 ## 7. The season
 
 **One week.** Sunday bell to Sunday bell, published in the interface with a countdown.
@@ -212,14 +245,32 @@ is no time left to regrow it.
 pays in, nothing is pooled, nothing is wagered. Split among the top three: sixty, thirty,
 ten.
 
-**Everybody else's payout is in the game.** Your liquidated book converts to Sap, which
-carries into the next season, plus a **vintage** — a cosmetic plant stamped with the season
-number that can never be grown again. Season one vintages will exist for exactly one week
-and then never again, and in a year they will be the only thing anybody wants.
+**Settlement — the choice everybody makes at the bell.** Your liquidated book does not just
+land in your wallet as Sap. You choose how to take it, once, and the choice is real:
+
+- **Carry.** Take the whole book as liquid Sap into next season. The best opening you can
+  buy: you start Monday able to plant Blue Chips while everyone else is buying Penny seeds.
+  Maximum tempo, nothing permanent.
+- **Endowment.** Convert the book into a permanent Sap-per-second trickle that never stops
+  and never resets, at a deliberately worse rate — it takes several seasons to pay back.
+  Endowments stack across seasons and are visible in your garden as a widening bed of
+  evergreen plants that cannot be stolen. This is the veteran's path and it compounds.
+- **Vintage.** Spend the book on a **season vintage** — a cosmetic plant stamped with the
+  season number, whose tier scales with how much book you burned on it. It can never be
+  grown again. Season one vintages will exist for exactly one week and then never, and in a
+  year they will be the only thing anybody wants.
+
+Three options, no dominant one: tempo now, compounding forever, or the flex. That decision
+at the closing bell is the second-best moment in the game after the Sprout Reveal, and it
+gives the whole week somewhere to point.
+
+**Why settlement is a sink and not an exit.** A currency needs somewhere to go, not a way
+out. All three options consume the book and pay in game — none of them creates a rate at
+which Sap becomes anything else. That distinction is the whole reason this works; see §10.
 
 **What resets and what does not.** Plants clear. Sap, plots, defenses, cosmetics, vintages,
-your tree, your stumps and your sprint record all carry. A season resets the board, not
-your life.
+endowments, your tree, your stumps and your sprint record all carry. A season resets the
+board, not your life.
 
 ## 8. Sessions and accounts
 
@@ -258,13 +309,29 @@ players trade and that settle into a prize competition is the fact pattern that 
 letters. It also loses nothing — *Beargonia* is funnier than a ticker, and it is ours. If
 real names are wanted, the roster file is where that decision lands, after review.
 
-**Universal cash-out.** The season already sends real value out of the game: a hundred
-dollars a week to the top three, which is a tournament prize and is how tournaments have
-always worked. Making *every* player's liquidated book convertible to coin is a different
-thing — it turns Sap itself into money, which is the one change that makes the whole game
-an earning scheme rather than a game with a prize in it. The recommendation is the split in
-§7: coin to the winners, game value to everyone else, vintages as the thing people actually
-chase.
+**Trading settled Sap for coin.** The season already sends real value out: a hundred
+dollars a week to the top three. That is a tournament prize, decided by rank, and
+tournaments have always worked that way.
+
+A **trade-in is a different object**, and the difference is one word: **rate**. A prize has
+no rate. Rank decides it, the amount is fixed in advance, and once it is paid the studio
+owes nobody anything. A trade-in has a published rate at which Sap becomes coin, and a rate
+is a standing promise to convert on demand. That makes every unit of Sap ever minted a
+claim against the treasury, it makes Sap money rather than points, and it makes the studio
+the counterparty to all of it — which is the operator posture the entire project was built
+to avoid. It is also the change that reframes the whole game from *a game with a prize* to
+*an earning scheme*, which is the framing that attracts scrutiny to everything else.
+
+**The goal behind the ask is broader distribution, and that is reachable without a rate.**
+If the aim is that more than three people see coin, widen the prize structure rather than
+opening a conversion window: pay the top ten out of the same hundred, or add a flat
+participation prize to every eligible player who finishes the season above a published
+activity threshold. Both are still rank-and-rule prizes with fixed amounts and no standing
+obligation, and both put coin in far more hands than a trade-in most players would never
+clear the minimum for anyway.
+
+The recommendation therefore stands: coin to the winners, with the placings widened as far
+as the pot allows, and the three settlement options in §7 as the sink for everybody's book.
 
 Both are recorded in `PROPOSED_S0_AMENDMENT.md` for the review pass.
 
