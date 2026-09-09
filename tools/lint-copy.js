@@ -8,9 +8,16 @@ const root = path.resolve(__dirname, '..');
 const banned = JSON.parse(fs.readFileSync(path.join(root, 'shared/banned-copy.json'), 'utf8')).patterns
   .map((p) => new RegExp(p, 'i'));
 
+// Words a DISCLAIMER must be able to say in order to deny them: "nothing is wagered",
+// "not redeemable or withdrawable". Banning these outright makes it impossible to state
+// the very rules I-4 exists to enforce. Exempted PER-PATTERN rather than per-page, so the
+// inducement patterns that actually matter - yield, dividends, returns, earn, activate a
+// broker - stay enforced everywhere, including on the marketing page.
+const NEGATABLE = /^(wager|withdraw|redeem|convert|stake)/i;
 const hits = [];
-function checkString(s, where) {
+function checkString(s, where, opts = {}) {
   for (const re of banned) {
+    if (opts.allowNegations && NEGATABLE.test(re.source)) continue;
     if (re.test(s)) hits.push({ where, pattern: re.source, text: s.slice(0, 120) });
   }
 }
@@ -45,8 +52,9 @@ walkDir(path.join(root, 'client/src'), ['.ts', '.html'], (p) => {
 // these pages exist to state the negations - "nothing is wagered", "not redeemable",
 // "not withdrawable". Banning the words here would make it impossible to disclaim them.
 // Game copy, content and lore remain fully covered above.
-const LEGAL_PAGES = new Set(['rules.html', 'terms.html', 'privacy.html']);
-walkDir(path.join(root, 'client'), ['.html'], (p) => { if (LEGAL_PAGES.has(path.basename(p))) return; checkString(fs.readFileSync(p, 'utf8'), path.relative(root, p)); });
+const DISCLAIMER_PAGES = new Set(['rules.html', 'terms.html', 'privacy.html', 'home.html']);
+walkDir(path.join(root, 'client'), ['.html'], (p) =>
+  checkString(fs.readFileSync(p, 'utf8'), path.relative(root, p), { allowNegations: DISCLAIMER_PAGES.has(path.basename(p)) }));
 
 if (hits.length) {
   console.error(`BANNED COPY: ${hits.length} hit(s)`);

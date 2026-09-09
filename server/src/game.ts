@@ -57,6 +57,7 @@ export interface PlayerRec {
   missions?: P.MissionState;    // town missions: active progress + day each was last completed
   carried?: { plant: Plant; from: string; fromPlot: number } | null;
   profile?: import('../../shared/season').PlayerProfile;   // season tally, history, endowment, vintages
+  agent?: boolean;              // ElizaOS or other automated player; ranks publicly, never paid
 }
 const dayKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
 const DEFAULT_COS: P.Cosmetics = { fence: 'wood', lantern: false, nameplate: false, path: false, gnomeHat: -1 };
@@ -309,6 +310,8 @@ export class Game {
     }
     if (!rec) {
       rec = this.newPlayer(id, secret, m.name, m.save ?? null, now);
+      // Declared automated players rank publicly but are never prize-eligible.
+      if (m.agent === true) rec.agent = true;
       this.feed(rec.villageId, 'join', `${rec.name} moved into lot ${rec.lotId + 1}`);
     } else if (this.live.has(id)) {
       this.replaceSession(this.live.get(id)!);
@@ -322,6 +325,8 @@ export class Game {
     if (rec.plotCount < DEFAULT_PLOTS) { while (rec.plots.length < DEFAULT_PLOTS) { rec.plots.push(null); rec.lockedUntil.push(0); } rec.plotCount = DEFAULT_PLOTS; this.store.touch(); }
     const spawn = this.spawnFor(rec);
     const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null, lastLot: -1, lastAskAt: 0 };
+    // Tell them plainly how long they are safe, rather than leaving it to be discovered.
+    this.send(ws, { t: 'toast', text: `Garden secure for ${Math.round(GRACE_MS / 60000)} minutes!` });
     this.live.set(id, live);
     this.sendWelcome(live, rec, now);
     if (off >= 1) this.send(ws, { t: 'toast', text: `${copyJson.ui.offlineBack} ${Math.floor(off)} ${copyJson.ui.sap}.` });
@@ -847,6 +852,7 @@ export class Game {
       entrants.map((r) => ({
         id: r.id, name: r.name, plots: r.plots,
         profile: setSprintRecord(currentProfile(r.profile, bellAt), r.name === recordName),
+        ...(r.agent ? { agent: true } : {}),
         // D-2: both stay 0 until the chain reader is live, so nobody is prize-eligible
         // yet. Standings and settlement still run; only the payout list is empty.
         ponsGarden: 0, pons: 0,

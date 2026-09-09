@@ -21,6 +21,8 @@ import {
 import type { Plant, Species, Sector } from '../../shared/types';
 
 export interface BellPlayer {
+  /** Automated player. Ranks publicly, never paid - see Season Rules and the plugin README. */
+  agent?: boolean;
   id: string;
   name: string;
   plots: (Plant | null)[];
@@ -98,7 +100,7 @@ export function runBell(
       name: pl.name,
       score: scoreOf(pl.profile.tally, book),
       bookValue: book,
-      eligible: isPrizeEligible(pl.ponsGarden, pl.pons),
+      eligible: !pl.agent && isPrizeEligible(pl.ponsGarden, pl.pons),
     };
   });
 

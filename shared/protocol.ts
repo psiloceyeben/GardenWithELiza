@@ -90,7 +90,7 @@ export interface CarryAppearance { mutation: MutationId; size: number; }
 export interface SnapPlayer { id: string; x: number; y: number; d: Dir; f: boolean; m: boolean; c: string; ch: number; b?: boolean; cp?: CarryAppearance; }
 
 export type ClientMsg =
-  | { t: 'hello'; id: string; secret: string; name: string; save?: GameState | null; village?: string }
+  | { t: 'hello'; id: string; secret: string; name: string; save?: GameState | null; village?: string; agent?: boolean }
   | { t: 'input'; dx: number; dy: number; x: number; y: number; d: Dir; f: boolean; m: boolean }
   | { t: 'buy'; slot: number }
   | { t: 'plant'; seedUid: string; plotId: number }
@@ -172,7 +172,7 @@ export const CARRY_SPEED = 0.7;
 export const SPRINKLER_SPEED = 0.6;
 export const TAG_RADIUS = 22;
 export const GNOME_RADIUS = 44;
-export const GRACE_MS = 10 * 60_000;
+export const GRACE_MS = 5 * 60_000;   // a new or returning garden is safe for five minutes
 export const STEAL_CAP_PER_HOUR = 3;
 export const BOUNTY_SEC = 60;
 export const BOUNTY_MIN = 20;

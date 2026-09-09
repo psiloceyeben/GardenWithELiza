@@ -60,8 +60,8 @@ const card = (c, w, h, dataUri) => `<!doctype html><meta charset="utf-8"><style>
 </style>
 <div class="shot"></div><div class="veil"></div><div class="frame"></div>
 <div class="top"><div class="headline">${c.headline}</div><div class="sub">${c.sub}</div></div>
-<div class="bottom"><div class="name">PONS GARDEN<small>development preview</small></div>
-<div class="url">play as a guest<br>prometheus7.com/ponsgarden</div></div>`;
+<div class="bottom"><div class="name">PONS GARDEN<small>ponsgarden.com</small></div>
+<div class="url">play as a guest<br>ponsgarden.com</div></div>`;
 
 (async () => {
   fs.mkdirSync(shotDir, { recursive: true });

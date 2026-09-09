@@ -33,6 +33,9 @@ export function renderTape(mv: MarketView): void {
   const tape = document.getElementById('tape');
   if (!tape) return;
   tape.hidden = false;
+  // Publish the tape's real height so the HUD and feed sit below it at every width,
+  // rather than below a number somebody guessed once.
+  document.documentElement.style.setProperty('--tape-h', `${tape.offsetHeight}px`);
 
   const moves = Object.entries(mv.sectors)
     .sort((a, b) => b[1] - a[1])

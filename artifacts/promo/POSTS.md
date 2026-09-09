@@ -9,7 +9,7 @@ security or price feed, or tells anyone to acquire anything.
 **Cards:** `01-your-land`, `02-grow-guard`, `03-the-village`, `04-the-board`,
 `05-the-oracle`, `06-the-bell` — each at 1080×1080 and 1080×1350, shot from the live game.
 
-**Link:** prometheus7.com/ponsgarden — free, no account, plays in the browser.
+**Link:** ponsgarden.com — free, no account, plays in the browser.
 
 ---
 
@@ -25,7 +25,7 @@ your neighbours walking through the gate and uprooting the good one.
 
 No account. No download. Plays in a browser.
 
-prometheus7.com/ponsgarden
+ponsgarden.com
 
 ### Long
 
@@ -46,7 +46,7 @@ like a gnome to everybody else and does absolutely nothing.
 
 Free, no account, no download. Playing as a guest takes about four seconds.
 
-→ prometheus7.com/ponsgarden
+→ ponsgarden.com
 
 ---
 
@@ -62,7 +62,7 @@ fifteen minutes, pays 243 a second, and barely moves at all.
 
 That is the whole risk curve, growing in a field.
 
-prometheus7.com/ponsgarden
+ponsgarden.com
 
 ### Long
 
@@ -89,7 +89,7 @@ cheap ones at all.
 Every company, sector and movement is invented. Nothing tracks a real security or a real
 price feed. It is a market that exists entirely inside a game about stealing plants.
 
-→ prometheus7.com/ponsgarden
+→ ponsgarden.com
 
 ---
 
@@ -107,7 +107,7 @@ which sectors move and why. The ticker tape prints its reasoning:
 
 Powered by Oracle7. Literally.
 
-prometheus7.com/ponsgarden
+ponsgarden.com
 
 ### Long
 
@@ -137,7 +137,7 @@ writing it.
    by comes from a published table it cannot touch. Players are never exposed to an
    unbounded model.
 2. **Never in the payout path.** Season standing is decided by what players do — steals,
-   tags, defences held, missions finished. Oracle7 moves the market everyone trades in
+   tags, missions finished. Oracle7 moves the market everyone trades in
    equally. It does not decide who wins, so an outage can never become a prize dispute.
 3. **Fully logged.** Every brief is written to the season log with its inputs, so any result
    can be recomputed and audited months later. Authored is not the same as unaccountable.
@@ -150,7 +150,7 @@ never see a prompt.
 
 "Powered by Oracle7" is a claim the season log can substantiate.
 
-→ prometheus7.com/ponsgarden
+→ ponsgarden.com
 
 ---
 
@@ -165,7 +165,7 @@ Seven days, then every garden in Pons Garden liquidates at whatever the market s
 exact second. Top three split the pot.
 
 Free to enter. Nothing staked, nothing pooled, nothing wagered. Decided by steals, tags and
-defences held — not by dice.
+missions — not by dice.
 
 Season 1 opens 9 September, midnight Pacific.
 
@@ -184,7 +184,7 @@ stocks in the last hour and hope for a spike at the bell?
 The closing hours of a season are the most dangerous in the game. Everything on the board is
 worth stealing and there is no time left to regrow it.
 
-**How standing works:** book value at the bell, plus steals, tags, defences held, missions
+**How standing works:** book value at the bell, plus steals, tags, missions
 finished, and the sprint record. Repeat steals from the same player are worth less each time,
 so raiding widely beats farming one neighbour. Every weight is published in the rules.
 
@@ -201,7 +201,7 @@ Season 1 vintages will exist for one week and then never again.
 
 **Season 1 opens 9 September at midnight Pacific.**
 
-→ prometheus7.com/ponsgarden
+→ ponsgarden.com
 
 ---
 
@@ -213,6 +213,6 @@ Season 1 vintages will exist for one week and then never again.
   Oracle line has.
 - The line that lands hardest is the plain one: **"your land stays yours, your plants do
   not."** Lead with it when in doubt.
-- Every card carries `development preview` and the URL, so they stay accurate if reposted.
+- Every card carries the URL, so they stay accurate if reposted.
 - The rules, terms and privacy pages are live and linkable if anyone asks:
-  prometheus7.com/ponsgarden/rules.html
+  ponsgarden.com/rules.html
