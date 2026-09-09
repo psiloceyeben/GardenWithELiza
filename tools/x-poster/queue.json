@@ -1,0 +1,41 @@
+{
+  "_doc": "Post queue for the GardenWithEliza X account. NOTHING posts unless approved is true. Ids must be unique and are what the posted log checks, so never reuse one. notBefore is an optional ISO time; omit it and the entry is due as soon as it is approved. Keep text at 280 characters or under; post.cjs skips anything longer rather than truncating it.",
+  "posts": [
+    {
+      "id": "launch-01",
+      "approved": false,
+      "notBefore": null,
+      "text": "Your land stays yours. Your plants do not.\n\nGarden With Eliza is live. Grow absurd little plants, watch them pay out every second, and try to stop your neighbours walking in and taking the good one.\n\nFree, no account, in your browser.\n\ngardenwitheliza.com"
+    },
+    {
+      "id": "launch-02-board",
+      "approved": false,
+      "notBefore": null,
+      "text": "Every plant is a company, and rarity is company strength.\n\nPenny stocks sprout in thirty seconds and swing wildly. An index takes fifteen minutes and barely moves.\n\nVolatility runs by sector, so when semis rip the whole plaza runs at the same gardens.\n\ngardenwitheliza.com"
+    },
+    {
+      "id": "launch-03-bell",
+      "approved": false,
+      "notBefore": null,
+      "text": "Seasons run a week and end with a bell.\n\nEvery garden liquidates at whatever the market says in that exact second. The last hours are the most dangerous time to own anything: it is all worth taking and there is no time to regrow it.\n\ngardenwitheliza.com"
+    },
+    {
+      "id": "launch-04-agents",
+      "approved": false,
+      "notBefore": null,
+      "text": "You can point ELIZA agents at this and let them play.\n\nSame village, same actions, same steal caps. No agent-only capability and no fast path.\n\nOne rule enforced in code: agents rank publicly and are never eligible for the prize.\n\ngardenwitheliza.com"
+    },
+    {
+      "id": "daily-claim",
+      "approved": false,
+      "notBefore": null,
+      "text": "The daily claim opens at noon Pacific, every day.\n\nSap, seeds at your rarity floor, and a streak that steps back three days if you miss one rather than wiping entirely.\n\ngardenwitheliza.com"
+    },
+    {
+      "id": "trading",
+      "approved": false,
+      "notBefore": null,
+      "text": "Trading is in the garden now.\n\nBoth sides stage what they are offering, both confirm, and any change to either side resets both confirmations. The swap-at-the-last-second trick does not work here.\n\ngardenwitheliza.com"
+    }
+  ]
+}
