@@ -105,6 +105,62 @@ Feral ×5, Backwards ×2, Screaming ×8. Odds published in the interface.
 
 ## 4a. The board — thirty listed companies
 
+**Naming convention: `STOCKNAMEplant`.** The shipping roster (`PONS_ROSTER=market`) uses the
+actual names of thirty chosen listed companies with `plant` appended — NVIDIAplant,
+TESLAplant, GAMESTOPplant — with the real ticker on the fence sign. Rarity tier is company
+strength: meme and distressed names at Penny, megacaps at the top, index funds above them.
+Benjamin's decision of 2026-09-08 under the amended I-9. Posture: **ship now, reskin on a
+letter** — the swap is a one-file flip, kept permanently cheap by design.
+
+### The market roster (`PONS_ROSTER=market`)
+
+| Tier | Ticker | Plant | Sector |
+|---|---|---|---|
+| Penny | GME | **GAMESTOPplant** | Retail |
+| Penny | AMC | **AMCplant** | Retail |
+| Penny | NKLA | **NIKOLAplant** | Energy |
+| Penny | WE | **WEWORKplant** | Shells |
+| Penny | PTON | **PELOTONplant** | Growth |
+| Small Cap | HOOD | **ROBINHOODplant** | Financials |
+| Small Cap | PLTR | **PALANTIRplant** | Adtech |
+| Small Cap | RIVN | **RIVIANplant** | Energy |
+| Small Cap | SNAP | **SNAPplant** | Adtech |
+| Small Cap | CHWY | **CHEWYplant** | Retail |
+| Mid Cap | SBUX | **STARBUCKSplant** | Staples |
+| Mid Cap | F | **FORDplant** | Energy |
+| Mid Cap | PFE | **PFIZERplant** | Biotech |
+| Mid Cap | KR | **KROGERplant** | Staples |
+| Mid Cap | UPS | **UPSplant** | Retail |
+| Blue Chip | JPM | **JPMORGANplant** | Financials |
+| Blue Chip | KO | **COCACOLAplant** | Staples |
+| Blue Chip | DIS | **DISNEYplant** | Retail |
+| Blue Chip | WMT | **WALMARTplant** | Staples |
+| Blue Chip | JNJ | **JOHNSONplant** | Biotech |
+| Megacap | NVDA | **NVIDIAplant** | Semis |
+| Megacap | AAPL | **APPLEplant** | Semis |
+| Megacap | TSLA | **TESLAplant** | Energy |
+| Megacap | AMZN | **AMAZONplant** | Retail |
+| Megacap | MSFT | **MICROSOFTplant** | Semis |
+| Index | SPY | **SP500plant** | Funds |
+| Index | VOO | **VANGUARDplant** | Funds |
+| Index | QQQ | **NASDAQplant** | Funds |
+| Index | BRK | **BERKSHIREplant** | Funds |
+| Index | GLD | **GOLDplant** | Funds |
+
+**Name and ticker only — no logos, brand art, colourways or affiliation claims.** Characters
+are original designs: NVIDIAplant is an original plant creature that glows green and hums,
+not a rendering of anyone's branding. Volatility is internal and references no real price or
+feed, so no plant tracks an actual security.
+
+### The safe roster (`PONS_ROSTER=safe`) — the reskin, pre-built
+
+The fictional board below is not a discarded alternative. It is **the fallback that ships
+the moment a letter arrives**: same thirty IDs, same tiers, same sectors, same art, only the
+display names and tickers differ. That is what makes the flip one file and no migration. It
+is built first and kept current, per the revert trigger in the amended I-9.
+
+
+
 Every plant is a listed company with a **ticker** and a **sector**. The ticker is what sells
 the larp: four letters on a fence sign, on the notice board, on the ticker tape running
 across the top of the plaza. Nobody needs a real company's name to feel like they are
@@ -288,8 +344,14 @@ Read-only. The game looks at a public wallet and never touches it.
 | Total time held | **A conviction tree** in your corner, seedling through fruiting |
 | Each large past sell | **A permanent stump** on your fence, one per sell, visible to every visitor |
 | Two or more partner tokens | **Hybrid species** in your shop that nobody else can grow |
-| Broker NFTs and stock tokens | **Exotic flora outside the fence.** Scenery. Affects no number. |
 | Address hash | Which of eight **palettes** your land wears |
+| Balance held, checked daily | **The daily dividend** — see §6a |
+
+**The chain surface is one thing: a read-only PONS wallet scanner.** As of 2026-09-08 the
+StonkBrokers layer is removed entirely — no broker NFTs, no tokenized stock, no exotic flora
+outside the fence, no links. Nothing in the product touches a real security, so no US-player
+restriction is inherited and the game is open to everyone. The stock theme is wholly
+fictional: names on plants, and a market that exists only inside the game.
 
 A wallet that held from the start and never sold has twenty plots, a fruiting tree, a clean
 fence and a conveyor that has forgotten Penny stocks exist. A wallet that panic-sold four

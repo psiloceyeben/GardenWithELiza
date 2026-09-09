@@ -101,8 +101,10 @@ rank on the public board; only the payout list is filtered.
 **4.1** Swap the mock reader for the real archive RPC. *Blocked on Benjamin — §9A.*
 **4.2** Verify derived land against wallets with known histories; confirm long holders get
 20 plots and that `PONS_FROM_BLOCK` is not truncating early history.
-**4.3** Run `tools/check_broker_views.cjs` if broker scenery is enabled; a
-`metadata is not found` means the endpoint is not archive-capable.
+**4.3** Delete the StonkBrokers layer: broker and stock-token reads, the exotic flora
+outside the fence, `check_broker_views.cjs`, the broker env vars, and the broker sections of
+the setup doc. Retire `STONKBROKER_INTEGRATION.md`, `COUNSEL_PACKET_STOCK_REWARDS.md` and
+`PROPOSED_S0_AMENDMENT.md` to an `archive/` folder. What remains is the PONS wallet scanner.
 **4.4** WalletConnect for mobile wallets. *Blocked on Benjamin — §9A.*
 
 **Exit:** `/health` reports `reader: cached(rpc-worker)` and three known wallets derive
@@ -156,64 +158,74 @@ Grouped by whether it blocks work. Nothing in A or E can be worked around.
 
 ### A. Values and credentials — blocks Phase 4 and mobile
 
-1. **Archive-capable RPC endpoint** for Robinhood Chain, chain ID 4663. Must be archive;
-   the public endpoint already failed with `metadata is not found`. Goes into the systemd
-   unit only — never into chat, a commit or a document.
+Five values, down from seven. The StonkBrokers layer is removed, so the broker collection
+block is gone and the broker view check no longer runs.
+
+1. **Archive-capable RPC endpoint**, chain ID 4663. Still must be archive — the scanner
+   replays PONS balance history to work out how long each wallet held and when it sold, and
+   an ordinary node has thrown that away. Goes into the systemd unit only, never into chat,
+   a commit or a document.
 2. **PONS contract address.**
 3. **PONS deployment block.** Set too high and every long holder looks like a newcomer.
 4. **PONS decimals** (almost certainly 18).
-5. **Partner meme-token allowlist**, as `SYMBOL:0xaddress`. No stock token and no broker
-   NFT may ever appear here.
-6. **StonkBroker collection deployment block**, if broker scenery is wanted.
-7. **WalletConnect project id** from `cloud.walletconnect.com`, free — without it, phones
+5. **WalletConnect project id** from `cloud.walletconnect.com`, free — without it, phones
    play as guests only.
 
-Steps and checks are in `BEN_STONKBROKER_SETUP.md`.
+*Optional:* a **partner meme-token allowlist** as `SYMBOL:0xaddress`, if you still want
+hybrid species. Not required for launch.
+
+Steps and checks are in `BEN_STONKBROKER_SETUP.md` (to be renamed; the broker sections no
+longer apply).
 
 ### B. Money and process — blocks the prize, not the build
 
-8. **A dedicated prize wallet**, separate from the dev supply, funded ahead of each season.
-9. **Decide how winners are paid** — in coin or in fiat — and who executes it. I do not
-   move funds; the payout is a human step by design.
-10. **A prize ledger**: season, winners, amounts, transaction references, date paid. Boring
-    and essential the first time anyone asks.
+8. **A dedicated prize wallet** holding PONS, separate from the dev supply, funded ahead of
+   each season.
+9. **Fix how "$100 in PONS" is calculated** and publish it in the Season Rules before the
+   season opens — which reference price, from which source, read at which moment. The
+   closing bell is the natural moment. Without a stated reference, the prize amount is
+   arguable after the fact, and that argument always happens with the winner.
+10. **A prize ledger**: season, winners, PONS amounts, the reference price used, transaction
+    hashes, date paid. Boring, and essential the first time anyone asks.
+11. **Who executes the payout.** I do not move funds — the transfer is a human step by
+    design, and it stays that way.
 
 ### C. Decisions — blocks content and rules copy
 
-11. **Final roster sign-off.** The 30 names as drafted, or your edits. The dual-roster
+12. **Final roster sign-off.** The 30 names as drafted, or your edits. The dual-roster
     architecture means this is not urgent, but the art depends on the final list.
-12. **Prize split.** Currently 60/30/10 to the top three. Widening to ten places, or adding
+13. **Prize split.** Currently 60/30/10 to the top three. Widening to ten places, or adding
     a participation prize above an activity threshold, puts coin in more hands from the same
     hundred — worth deciding before the rules page is written.
-13. **Season start day and time**, with a timezone. Sunday bell to Sunday bell is assumed.
-14. **Eligibility threshold** — what minimum holding qualifies for the prize board.
-15. **Excluded jurisdictions**, if any, for the prize competition.
+14. **Season start day and time**, with a timezone. Sunday bell to Sunday bell is assumed.
+15. **Eligibility threshold** — what minimum holding qualifies for the prize board.
+16. **Excluded jurisdictions**, if any, for the prize competition.
 
 ### D. Legal review — blocks Season 1, not Season 0
 
-16. **Terms, privacy and Season Rules reviewed** before real money is on the board. A
+17. **Terms, privacy and Season Rules reviewed** before real money is on the board. A
     free-entry skill competition is the simplest structure there is, but the rules page is
     the document that proves it and it should not be the one thing nobody read.
-17. **Trademark posture: decided.** Recorded in the amended I-9 — ship the larp, reskin on
+18. **Trademark posture: decided.** Recorded in the amended I-9 — ship the larp, reskin on
     a letter. No further action unless one arrives, in which case tell me and it is a
     one-flag flip.
-18. **Optional:** counsel's eye on the prize structure. Lower stakes than the earlier
+19. **Optional:** counsel's eye on the prize structure. Lower stakes than the earlier
     proposals, but it is the first time value leaves the studio.
 
 ### E. Infrastructure approvals — blocks Phase 5
 
-19. **Approve installing PostgreSQL on Box C.** It is a shared host running the Oracle
+20. **Approve installing PostgreSQL on Box C.** It is a shared host running the Oracle
     instances, so I want your word before an apt install.
-20. **Name an off-host backup destination.** Box A, an object store, anywhere not Box C. A
+21. **Name an off-host backup destination.** Box A, an object store, anywhere not Box C. A
     backup on the same machine as the database is not a backup.
 
 ### F. Accounts — small, do whenever
 
-21. Analytics and error-tracking accounts, if you want them; otherwise I ship without.
+22. Analytics and error-tracking accounts, if you want them; otherwise I ship without.
 
 ### G. Go/no-go
 
-22. **Season 0 review**, then the call on Season 1.
+23. **Season 0 review**, then the call on Season 1.
 
 ---
 
