@@ -24,6 +24,7 @@ import { SECTORS } from '../../shared/roster';
 import { sectorMovePct } from '../../shared/market';
 import { requestBrief, logBrief, composeHeadline, BRIEF_INTERVAL_MS, type Brief } from './market-brief';
 import * as D from '../../shared/daily';
+import * as T from '../../shared/trade';
 import copyJson from '../../content/copy.json';
 
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
@@ -87,6 +88,7 @@ export class Game {
   villages = new Map<string, VillageRec>();
   maps = new Map<string, Village>();
   live = new Map<string, Live>();
+  trades = new Map<string, T.TradeSession>();
   brief: Brief | null = null;
   briefPending = false;
   lastSteal: { thief: string; victim: string; plant: string } | undefined;
@@ -547,6 +549,11 @@ export class Game {
       case 'mission': return this.onMission(l, rec, String(m.id), m.action === 'claim' ? 'claim' : 'accept', now);
       case 'ask': return this.onAsk(l, rec, String(m.npc), String(m.text), now, m.requestId);
       case 'claim': return this.onClaim(l, rec, now);
+      case 'tradeOpen': return this.onTradeOpen(l, rec, String(m.playerId), now);
+      case 'tradeOffer': return this.onTradeOffer(l, rec, m.kind, String(m.uid), !!m.add, now);
+      case 'tradeSap': return this.onTradeSap(l, rec, Math.floor(Number(m.sap)), now);
+      case 'tradeConfirm': return this.onTradeConfirm(l, rec, !!m.confirmed, now);
+      case 'tradeClose': { const t = this.tradeOf(rec.id); if (t) this.closeTrade(t, 'cancelled'); return; }
       case 'ping': this.send(l.ws, { t: 'pong', n: m.n, now }); return;
     }
   }
@@ -641,6 +648,187 @@ export class Game {
 
 
   /** Push the player's claim status: ready now, or when it next opens. */
+
+  // --- trading ---------------------------------------------------------------------------
+  // Sessions live in memory only. A trade that does not survive a restart is a minor
+  // annoyance; a half-applied trade that did would be a duplication bug.
+
+  tradeOf(playerId: string): T.TradeSession | undefined {
+    for (const t of this.trades.values()) {
+      if (!t.closed && (t.a.playerId === playerId || t.b.playerId === playerId)) return t;
+    }
+    return undefined;
+  }
+
+  private tradeItemView(rec: PlayerRec, items: T.TradeItem[]): { kind: 'seed' | 'plant'; uid: string; speciesId: string; tier: Tier }[] {
+    return items.map((i) => {
+      const src = i.kind === 'seed'
+        ? rec.seeds.find((s) => s.uid === i.uid)
+        : (rec.plots.find((p) => !!p && p.uid === i.uid) ?? undefined);
+      return { kind: i.kind, uid: i.uid, speciesId: src?.speciesId ?? '?', tier: (src?.tier ?? 'common') as Tier };
+    });
+  }
+
+  pushTrade(t: T.TradeSession | null, playerId: string, message?: string): void {
+    const l = this.live.get(playerId);
+    if (!l) return;
+    if (!t || t.closed) { this.send(l.ws, { t: 'trade', session: null, ...(message ? { message } : {}) }); return; }
+    const mine = T.sideOf(t, playerId)!, theirs = T.otherSide(t, playerId)!;
+    const meRec = this.players.get(mine.playerId)!, themRec = this.players.get(theirs.playerId)!;
+    this.send(l.ws, {
+      t: 'trade',
+      session: {
+        id: t.id,
+        you: { items: this.tradeItemView(meRec, mine.items), sap: mine.sap, confirmed: mine.confirmed },
+        them: { name: themRec.name, items: this.tradeItemView(themRec, theirs.items), sap: theirs.sap, confirmed: theirs.confirmed },
+        expiresAt: t.openedAt + T.TRADE_TIMEOUT_MS,
+      },
+      ...(message ? { message } : {}),
+    });
+  }
+
+  private pushBoth(t: T.TradeSession, message?: string): void {
+    this.pushTrade(t, t.a.playerId, message);
+    this.pushTrade(t, t.b.playerId, message);
+  }
+
+  onTradeOpen(l: Live, rec: PlayerRec, otherId: string, now: number): void {
+    if (this.tradeOf(rec.id)) { this.send(l.ws, { t: 'toast', text: UI.tradeBusy }); return; }
+    const other = this.players.get(otherId);
+    const ol = this.live.get(otherId);
+    if (!other || !ol || otherId === rec.id) { this.send(l.ws, { t: 'toast', text: UI.tradeGone }); return; }
+    if (this.tradeOf(otherId)) { this.send(l.ws, { t: 'toast', text: UI.tradeBusyOther }); return; }
+    // Face to face only. Trading across the map would make the village smaller, not bigger.
+    if (Math.hypot(l.x - ol.x, l.y - ol.y) > T.TRADE_RANGE_PX) { this.send(l.ws, { t: 'toast', text: UI.tradeFar }); return; }
+
+    const t = T.openTrade(uid('tr'), rec.id, otherId, now);
+    this.trades.set(t.id, t);
+    this.pushBoth(t);
+  }
+
+  onTradeOffer(l: Live, rec: PlayerRec, kind: 'seed' | 'plant', itemUid: string, add: boolean, now: number): void {
+    const t = this.tradeOf(rec.id);
+    if (!t) return;
+    if (T.isExpired(t, now)) { this.closeTrade(t, 'expired'); return; }
+    const side = T.sideOf(t, rec.id)!;
+
+    if (!add) {
+      side.items = side.items.filter((i) => !(i.kind === kind && i.uid === itemUid));
+      T.resetConfirmations(t);              // removing is a change too
+      this.pushBoth(t);
+      return;
+    }
+
+    const owns = (k: T.TradeItemKind, u: string) => k === 'seed'
+      ? rec.seeds.some((s) => s.uid === u)
+      : rec.plots.some((p) => !!p && p.uid === u);
+    const err = T.canOffer(t, rec.id, { kind, uid: itemUid }, owns);
+    if (err) { this.send(l.ws, { t: 'toast', text: `${UI.tradeRefused}: ${err}` }); return; }
+
+    side.items.push({ kind, uid: itemUid });
+    T.resetConfirmations(t);
+    this.pushBoth(t);
+  }
+
+  onTradeSap(l: Live, rec: PlayerRec, sap: number, now: number): void {
+    const t = this.tradeOf(rec.id);
+    if (!t) return;
+    if (T.isExpired(t, now)) { this.closeTrade(t, 'expired'); return; }
+    const err = T.canOfferSap(t, rec.id, sap, rec.sap);
+    if (err) { this.send(l.ws, { t: 'toast', text: `${UI.tradeRefused}: ${err}` }); return; }
+    T.sideOf(t, rec.id)!.sap = sap;
+    T.resetConfirmations(t);
+    this.pushBoth(t);
+  }
+
+  onTradeConfirm(l: Live, rec: PlayerRec, confirmed: boolean, now: number): void {
+    const t = this.tradeOf(rec.id);
+    if (!t) return;
+    if (T.isExpired(t, now)) { this.closeTrade(t, 'expired'); return; }
+    if (confirmed && T.isEmpty(t)) { this.send(l.ws, { t: 'toast', text: UI.tradeEmpty }); return; }
+    T.sideOf(t, rec.id)!.confirmed = confirmed;
+    if (T.bothConfirmed(t)) { this.settleTrade(t, now); return; }
+    this.pushBoth(t);
+  }
+
+  closeTrade(t: T.TradeSession, why: 'cancelled' | 'expired'): void {
+    if (t.closed) return;
+    t.closed = why;
+    this.trades.delete(t.id);
+    const msg = why === 'expired' ? UI.tradeExpired : UI.tradeCancelled;
+    this.pushTrade(null, t.a.playerId, msg);
+    this.pushTrade(null, t.b.playerId, msg);
+  }
+
+  /**
+   * Apply the trade. Everything is validated again here against live state, because the
+   * table was assembled over up to three minutes and a plant can be stolen, planted or sold
+   * in that time. Nothing moves until every check has passed.
+   */
+  settleTrade(t: T.TradeSession, now: number): void {
+    const A = this.players.get(t.a.playerId), B = this.players.get(t.b.playerId);
+    if (!A || !B) { this.closeTrade(t, 'cancelled'); return; }
+
+    const take = (rec: PlayerRec, side: T.TradeSide) => {
+      const seeds: Seed[] = [], plants: Plant[] = [];
+      for (const i of side.items) {
+        if (i.kind === 'seed') {
+          const s = rec.seeds.find((x) => x.uid === i.uid);
+          if (!s) return null;
+          seeds.push(s);
+        } else {
+          const idx = rec.plots.findIndex((p) => !!p && p.uid === i.uid);
+          if (idx < 0) return null;
+          plants.push(rec.plots[idx]!);
+        }
+      }
+      if (rec.sap < side.sap) return null;
+      return { seeds, plants };
+    };
+
+    const fromA = take(A, t.a), fromB = take(B, t.b);
+    if (!fromA || !fromB) {
+      T.resetConfirmations(t);
+      this.pushBoth(t, UI.tradeStale);
+      return;
+    }
+
+    const freeA = A.plots.filter((p) => !p).length, freeB = B.plots.filter((p) => !p).length;
+    if (!T.hasRoom(t.a, t.b, freeA, 99) || !T.hasRoom(t.b, t.a, freeB, 99)) {
+      T.resetConfirmations(t);
+      this.pushBoth(t, UI.tradeNoRoom);
+      return;
+    }
+
+    // Remove first, then give. The other order can duplicate an item if anything throws.
+    for (const s of fromA.seeds) A.seeds.splice(A.seeds.findIndex((x) => x.uid === s.uid), 1);
+    for (const p of fromA.plants) A.plots[A.plots.findIndex((x) => !!x && x.uid === p.uid)] = null;
+    for (const s of fromB.seeds) B.seeds.splice(B.seeds.findIndex((x) => x.uid === s.uid), 1);
+    for (const p of fromB.plants) B.plots[B.plots.findIndex((x) => !!x && x.uid === p.uid)] = null;
+
+    const place = (rec: PlayerRec, seeds: Seed[], plants: Plant[]) => {
+      rec.seeds.push(...seeds);
+      for (const p of plants) {
+        const slot = rec.plots.findIndex((x) => !x);
+        if (slot >= 0) { p.lastWeeded = now; rec.plots[slot] = p; }
+      }
+    };
+    place(A, fromB.seeds, fromB.plants);
+    place(B, fromA.seeds, fromA.plants);
+
+    if (t.a.sap) { this.addSap(A, -t.a.sap, `trade:${t.id}`); this.addSap(B, t.a.sap, `trade:${t.id}`); }
+    if (t.b.sap) { this.addSap(B, -t.b.sap, `trade:${t.id}`); this.addSap(A, t.b.sap, `trade:${t.id}`); }
+
+    t.closed = 'completed';
+    this.trades.delete(t.id);
+    this.store.touch();
+    this.pushState(A, { sap: A.sap, seeds: A.seeds, plots: A.plots });
+    this.pushState(B, { sap: B.sap, seeds: B.seeds, plots: B.plots });
+    this.pushLot(A); this.pushLot(B);
+    this.pushTrade(null, A.id, UI.tradeDone);
+    this.pushTrade(null, B.id, UI.tradeDone);
+    this.feed(this.vid(A), 'trade', T.describe(t, (id) => this.players.get(id)?.name ?? '?'));
+  }
   pushClaim(l: Live, rec: PlayerRec, now: number): void {
     const streak = rec.claimStreak ?? 0;
     this.send(l.ws, {

@@ -41,6 +41,14 @@ export interface Wild { id: string; x: number; y: number; speciesId: string; tie
 export type EventKind = 'seed_rain' | 'screaming_hour' | 'golden_hour';
 export interface VillageEvent { kind: EventKind; startedAt: number; endsAt: number; }
 export interface SprintEntry { name: string; ms: number; at: number; }
+
+/** A trade as the two participants see it. Both sides are fully visible to both players. */
+export interface TradeView {
+  id: string;
+  you: { items: { kind: 'seed' | 'plant'; uid: string; speciesId: string; tier: Tier }[]; sap: number; confirmed: boolean };
+  them: { name: string; items: { kind: 'seed' | 'plant'; uid: string; speciesId: string; tier: Tier }[]; sap: number; confirmed: boolean };
+  expiresAt: number;
+}
 export interface PublicLot {
   lotId: number;
   ownerId: string;
@@ -118,13 +126,18 @@ export type ClientMsg =
   | { t: 'mission'; id: string; action: 'accept' | 'claim' }
   | { t: 'ask'; npc: string; text: string; requestId?: string }
   | { t: 'claim' }
+  | { t: 'tradeOpen'; playerId: string }
+  | { t: 'tradeOffer'; kind: 'seed' | 'plant'; uid: string; add: boolean }
+  | { t: 'tradeSap'; sap: number }
+  | { t: 'tradeConfirm'; confirmed: boolean }
+  | { t: 'tradeClose' }
   | { t: 'ping'; n: number };
 
 export interface MissionState { active: Record<string, number>; done: Record<string, string>; }   // done[id] = day key
 
 export type ShopItem = 'train' | 'fence' | 'repair' | 'gnome' | 'sprinkler' | 'lock' | 'scarecrow' | 'mud' | 'bell';
 
-export interface FeedEvent { at: number; kind: 'steal' | 'tag' | 'gate' | 'reveal' | 'join' | 'uproot' | 'break'; text: string; }
+export interface FeedEvent { at: number; kind: 'steal' | 'tag' | 'gate' | 'reveal' | 'join' | 'uproot' | 'break' | 'trade'; text: string; }
 
 export type ServerMsg =
   | { t: 'welcome'; you: PrivateState; village: { id: string; seed: number; biome: number; name: string }; lots: PublicLot[]; players: SnapPlayer[]; names: Record<string, NameEntry>; feed: FeedEvent[]; now: number; villages: VillageInfo[] }
@@ -153,6 +166,7 @@ export type ServerMsg =
   | { t: 'board'; sprint: SprintEntry[]; bounties?: Bounty[]; trophies?: Trophies }
   | { t: 'market'; sectors: Record<string, number>; headline: string; season: { n: number; endsAt: number }; standing?: { score: number; rank: number; players: number; eligible: boolean } }
   | { t: 'claimState'; ready: boolean; nextAt: number; streak: number; sap: number; seeds: number }
+  | { t: 'trade'; session: TradeView | null; message?: string }
   | { t: 'pong'; n: number; now: number };
 
 // Phase one [TUNABLE]
