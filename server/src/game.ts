@@ -19,7 +19,10 @@ import { NPCS, MISSIONS, MISSION_MAX_ACTIVE, npcById, type MissionKind, type Mis
 import { ROSTER } from './roster';
 import { LEGACY_SPECIES } from '../../shared/roster';
 import { currentProfile, recordSteal, recordTag, recordMission, setSprintRecord, runBell, writeLedgerRow, dueBellSeason } from './season';
-import { seasonEnd } from '../../shared/season';
+import { seasonEnd, seasonNumberAt, bookValue, scoreOf, standings, SEASON_ONE_START_MS } from '../../shared/season';
+import { SECTORS } from '../../shared/roster';
+import { sectorMovePct } from '../../shared/market';
+import { requestBrief, logBrief, BRIEF_INTERVAL_MS, type Brief } from './market-brief';
 import copyJson from '../../content/copy.json';
 
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
@@ -77,6 +80,9 @@ export class Game {
   villages = new Map<string, VillageRec>();
   maps = new Map<string, Village>();
   live = new Map<string, Live>();
+  brief: Brief | null = null;
+  briefPending = false;
+  lastSteal: { thief: string; victim: string; plant: string } | undefined;
   guestPurges = new Map<string, ReturnType<typeof setTimeout>>();
   private walletRevision = new WeakMap<Live, number>();
   private movementBudgets = new WeakMap<Live, MovementBudget>();
@@ -756,6 +762,7 @@ export class Game {
     thief.carried = null;
     const sp = SP.get(c.plant.speciesId)!; c.plant.lastWeeded = now; thief.plots[free] = c.plant; thief.stats.steals += 1;
     thief.profile = recordSteal(currentProfile(thief.profile, now), c.from);   // season scoring, decays per victim
+    this.lastSteal = { thief: thief.name, victim: this.players.get(c.from)?.name ?? 'someone', plant: sp.name };   // feeds the Oracle brief
     const wk = this.weekly(thief, now); wk.steals += 1; if (E.tierIndex(c.plant.tier) > wk.heistTier) { wk.heistTier = E.tierIndex(c.plant.tier); wk.heistSpecies = c.plant.speciesId; }
     const owner = this.players.get(c.from);
     if (owner) {
@@ -858,6 +865,51 @@ export class Game {
     try { writeLedgerRow(process.env.PONS_DATA ?? '.', result); }
     catch { console.error('prize ledger write failed'); }
     console.log(`season ${season} settled: ${result.standings.length} players, ${result.payouts.length} in the money`);
+  }
+
+  /**
+   * Market broadcast. Sends every player the sector board, the current Oracle headline,
+   * the season countdown and their own live standing.
+   *
+   * The brief is refreshed on its own slower cadence and never awaited here - a slow
+   * Oracle must not delay a broadcast (market-brief.ts law 4).
+   */
+  marketTick(now: number): void {
+    if (!this.brief || now - this.brief.at >= BRIEF_INTERVAL_MS) {
+      const at = now;
+      this.brief = this.brief ?? { at, overrides: new Map(), headline: 'The market opens.', source: 'fallback' };
+      if (!this.briefPending) {
+        this.briefPending = true;
+        const digest = { season: seasonNumberAt(now), players: this.live.size, ...(this.lastSteal ? { lastSteal: this.lastSteal } : {}) };
+        void requestBrief(digest, at)
+          .then((b) => { this.brief = b; logBrief(process.env.PONS_DATA ?? '.', b, digest); })
+          .catch(() => { /* law 4 */ })
+          .finally(() => { this.briefPending = false; });
+      }
+    }
+
+    const sectors: Record<string, number> = {};
+    for (const s of SECTORS) sectors[s] = sectorMovePct(s, now, this.brief.overrides);
+    const season = seasonNumberAt(now);
+    const endsAt = season > 0 ? seasonEnd(season) : SEASON_ONE_START_MS;
+
+    // Standings are computed once, not per socket.
+    const rows = [...this.players.values()].map((r) => {
+      const prof = currentProfile(r.profile, now);
+      const book = bookValue(r.plots, (id) => SP.get(id), now, this.brief!.overrides);
+      return { playerId: r.id, name: r.name, score: scoreOf(prof.tally, book), bookValue: book, eligible: false };
+    });
+    const table = standings(rows);
+    const rank = new Map(table.map((t) => [t.playerId, t]));
+
+    for (const [id, l] of this.live) {
+      const st = rank.get(id);
+      this.send(l.ws, {
+        t: 'market', sectors, headline: this.brief.headline,
+        season: { n: season, endsAt },
+        ...(st ? { standing: { score: st.score, rank: st.rank, players: table.length, eligible: st.eligible } } : {}),
+      });
+    }
   }
   snapshot(now: number): void {
     for (const vid of this.villages.keys()) {

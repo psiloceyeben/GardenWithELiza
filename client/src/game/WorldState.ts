@@ -10,6 +10,7 @@ import {
   type Lot,
 } from "@shared/world";
 import { speciesById, COPY } from "../content";
+import { renderTape, type MarketView } from "../tape";
 import {
   Net,
   wsUrl,
@@ -54,6 +55,7 @@ export class WorldState {
   bubbles = new Map<string, { text: string; until: number }>();
   feed: P.FeedEvent[] = [];
   villages: P.VillageInfo[] = [];
+  market: MarketView | null = null;
   board: P.SprintEntry[] = [];
   bounties: P.Bounty[] = [];
   trophies: P.Trophies | null = null;
@@ -251,6 +253,10 @@ export class WorldState {
         this.hud.banner(Date.now());
         if (m.ev?.kind === "screaming_hour")
           this.view.effect("scream", this.player.x, this.player.y);
+        break;
+      case "market":
+        this.market = { sectors: m.sectors, headline: m.headline, season: m.season, standing: m.standing };
+        renderTape(this.market);
         break;
       case "board":
         this.board = m.sprint;

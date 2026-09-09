@@ -115,12 +115,15 @@ async function postgresChecks(url:string):Promise<void> {
   assert.deepEqual(restart.players.get('alice'),{sap:20});assert.deepEqual(restart.villages.get('v1'),{lots:['alice','bob']});
   await restart.close();pass('PostgreSQL restart reloads the last committed generation');
   const role='pons_runtime_'+randomUUID().replace(/-/g,'');
-  await admin.query('CREATE ROLE '+role+' LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS');
+  // The role needs a password: a real server authenticates with scram-sha-256, and a
+  // passwordless LOGIN role cannot connect. Only a 'trust'-configured host would pass.
+  const rolePw='p'+randomUUID().replace(/-/g,'');
+  await admin.query('CREATE ROLE '+role+" LOGIN PASSWORD '"+rolePw+"' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS");
   await inspector.query(`GRANT CONNECT ON DATABASE ${name} TO ${role};
     GRANT USAGE ON SCHEMA pons TO ${role};
     GRANT SELECT, INSERT, UPDATE, DELETE ON pons.players, pons.villages TO ${role};
     GRANT SELECT, INSERT ON pons.meta, pons.ledger TO ${role};`);
-  const restrictedUrl=new URL(connection);restrictedUrl.username=role;restrictedUrl.password='';
+  const restrictedUrl=new URL(connection);restrictedUrl.username=role;restrictedUrl.password=rolePw;
   const runtime=new PostgresPersistence(restrictedUrl.toString(),'runtime');
   const loaded=(await runtime.load())!;assert.deepEqual(loaded.players.alice,{sap:20});
   loaded.players.alice={sap:19};

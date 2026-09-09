@@ -16,11 +16,11 @@
     button:active { transform:translate(1px,1px); box-shadow:1px 1px 0 #000; }
     button:disabled { opacity:.45; cursor:default; }
     input { font-family:inherit; font-size:9px; color:var(--text); background:#120c18; border:2px solid var(--edge); padding:7px 8px; outline:none; }
-    #hud { position:fixed; top:8px; left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:7px 9px; line-height:1.8; pointer-events:none; max-width:46vw; }
+    #hud { position:fixed; top:36px; left:8px; background:rgba(24,18,32,.85); border:2px solid var(--edge); padding:7px 9px; line-height:1.8; pointer-events:none; max-width:46vw; }
     #hud .sap { color:var(--sap); }
     #hud .dim { color:var(--dim); font-size:7px; }
     #carry { color:#ff8080; font-size:7px; }
-    #feed { position:fixed; top:8px; right:8px; width:min(44vw,300px); pointer-events:none; font-size:7px; line-height:1.6; }
+    #feed { position:fixed; top:36px; right:8px; width:min(44vw,300px); pointer-events:none; font-size:7px; line-height:1.6; }
     .fe { background:rgba(24,18,32,.85); border-left:3px solid var(--edge); padding:4px 6px; margin-bottom:3px; }
     .fe-steal { border-color:#ff5555; } .fe-tag { border-color:#6cd46c; } .fe-gate, .fe-break { border-color:var(--sap); } .fe-reveal { border-color:#c26bff; } .fe-join { border-color:#8fc3ff; }
     #chatlog { position:fixed; left:8px; bottom:calc(58px + env(safe-area-inset-bottom)); font-size:7px; line-height:1.7; pointer-events:none; max-width:60vw; }
@@ -95,12 +95,25 @@
     }
     .t-common{color:#c8c8c8}.t-uncommon{color:#6cd46c}.t-rare{color:#4aa3ff}.t-epic{color:#c26bff}.t-legendary{color:#ffb02e}.t-mythic{color:#ff4d6d}
     .m-golden{color:#ffd24a}.m-holographic{color:#8ff}.m-colossal{color:#f8a}.m-feral{color:#8f8}.m-backwards{color:#aaf}.m-screaming{color:#f55}
+  /* Ticker tape. Pinned top-centre, above the world, below every panel. */
+  #tape{position:fixed;top:0;left:0;right:0;z-index:6;pointer-events:none;font-size:9px;line-height:1.5;
+    background:linear-gradient(#0b0908ee,#0b0908cc);border-bottom:2px solid #3a2e24;text-shadow:1px 1px 0 #000}
+  #tape-top{display:flex;gap:10px;align-items:baseline;padding:3px 8px 1px}
+  #tape-season{color:#f0c040;white-space:nowrap;flex:none}
+  #tape-head{color:#d9c9a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #tape-strip{overflow:hidden;padding:0 0 3px}
+  #tape-row{display:inline-flex;gap:14px;white-space:nowrap;padding-left:8px;animation:tape 42s linear infinite}
+  .tk{flex:none;letter-spacing:.5px}
+  .tk.up{color:#8cd25a}.tk.down{color:#e06666}.tk.flat{color:#8a7d6a}
+  @keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media (max-width:600px){#tape{font-size:8px}#tape-head{display:none}}
   </style>
 </head>
 <body>
   <div id="game"></div>
   <div id="status-stack">
   <div id="hud"><div class="dim">DEVELOPMENT PREVIEW</div><div><span class="sap" id="sap">0</span> <span class="dim">Sap</span> <span class="dim"><span id="sps">0</span>/s · <span id="plots">0/6</span></span></div><div class="dim" id="village"></div><div id="carry" hidden></div></div>
+  <div id="tape" hidden><div id="tape-top"><span id="tape-season"></span><span id="tape-head"></span></div><div id="tape-strip"><div id="tape-row"></div></div></div>
   <div id="feed"></div>
   <div id="banner" hidden></div>
   <div id="toast"></div>

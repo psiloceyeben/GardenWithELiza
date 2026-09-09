@@ -103,6 +103,8 @@ async function start(): Promise<void> {
     setInterval(() => { if (!stopping && !game.store.failed) try { game.economy(Date.now()); } catch { console.error('economy failed'); } }, 1000),
     // Season bell: checked once a minute. Settles at most one season per call.
     setInterval(() => { if (!stopping && !game.store.failed) try { game.runBellIfDue(Date.now()); } catch { console.error('season bell failed'); } }, 60_000),
+    // Ticker tape, season countdown and live standings.
+    setInterval(() => { if (!stopping && !game.store.failed) try { game.marketTick(Date.now()); } catch { console.error('market tick failed'); } }, 15_000),
     setInterval(() => { if (!stopping) void game.commit().catch(() => console.error('persistence failed; gameplay paused')); }, P.TICK_MS),
   ];
   for (const sig of ['SIGINT','SIGTERM'] as const) process.on(sig, () => {

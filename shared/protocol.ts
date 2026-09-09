@@ -150,6 +150,7 @@ export type ServerMsg =
   | { t: 'event'; ev: VillageEvent | null }
   | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }
   | { t: 'board'; sprint: SprintEntry[]; bounties?: Bounty[]; trophies?: Trophies }
+  | { t: 'market'; sectors: Record<string, number>; headline: string; season: { n: number; endsAt: number }; standing?: { score: number; rank: number; players: number; eligible: boolean } }
   | { t: 'pong'; n: number; now: number };
 
 // Phase one [TUNABLE]

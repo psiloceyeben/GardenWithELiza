@@ -95,9 +95,21 @@ export const isSpiking = (
   overrides?: ReadonlyMap<Sector, number>,
 ): boolean => marketMult(tier, sector, now, overrides) >= SPIKE_THRESHOLD;
 
-/** Percentage move for display on the ticker tape, e.g. -4.2. Sector-level, tier-free. */
+/**
+ * Full-swing percentage shown on the ticker tape.
+ *
+ * Position is [-1,1], but printing that raw gives "+95.7%", which reads as a market that
+ * has lost its mind. The tape is sector-level and tier-free, so it is scaled to the band a
+ * steady tier actually experiences — a plausible market move, and the honest figure for the
+ * blue chips and above that make up most of the board's value.
+ *
+ * This affects DISPLAY ONLY. Yields come from marketMult, which uses the raw position and
+ * the tier's own amplitude.
+ */
+export const MARKET_DISPLAY_PCT = 8;
+
 export const sectorMovePct = (
   sector: Sector,
   now: number,
   overrides?: ReadonlyMap<Sector, number>,
-): number => Math.round(sectorPosition(sector, now, overrides) * 1000) / 10;
+): number => Math.round(sectorPosition(sector, now, overrides) * MARKET_DISPLAY_PCT * 10) / 10;
