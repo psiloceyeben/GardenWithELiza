@@ -31,6 +31,9 @@
     #bar { position:fixed; bottom:calc(6px + env(safe-area-inset-bottom)); right:8px; display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
     /* Compact controls: the world is the point, the bar is not. */
     #bar button { font-size:8px; padding:5px 7px; box-shadow:1px 1px 0 #000; }
+  /* Ready state: the claim is the one button worth interrupting somebody for. */
+  #btn-daily.ready { background:#8cd25a; color:#12220a; animation:dailypulse 1.8s ease-in-out infinite; }
+  @keyframes dailypulse { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.35)} }
     #panel { position:fixed; left:50%; bottom:calc(48px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(96vw,560px); max-height:66vh; overflow:auto; background:var(--panel); border:3px solid var(--edge); box-shadow:4px 4px 0 #000; padding:10px; z-index:5; }
     #panel[hidden] { display:none; }
     /* Avoid incorrect opaque-overlay occlusion over CSS-scaled WebGL canvases
@@ -125,6 +128,7 @@
   <div id="joy" hidden><div id="joy-knob"></div></div>
   <button id="act" hidden>E</button>
   <div id="bar">
+    <button id="btn-daily" title="Daily reward, opens at noon Pacific">Daily</button>
     <button data-panel="conveyor" id="btn-conveyor">Conveyor</button>
     <button data-panel="seeds" id="btn-seeds">Bag</button>
     <button data-panel="shop" id="btn-shop">Shop</button>

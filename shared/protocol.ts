@@ -117,6 +117,7 @@ export type ClientMsg =
   | { t: 'talk'; npc: string }
   | { t: 'mission'; id: string; action: 'accept' | 'claim' }
   | { t: 'ask'; npc: string; text: string; requestId?: string }
+  | { t: 'claim' }
   | { t: 'ping'; n: number };
 
 export interface MissionState { active: Record<string, number>; done: Record<string, string>; }   // done[id] = day key
@@ -151,6 +152,7 @@ export type ServerMsg =
   | { t: 'sprint'; phase: 'start' | 'turn' | 'finish' | 'cancel'; ms?: number; best?: number; record?: boolean }
   | { t: 'board'; sprint: SprintEntry[]; bounties?: Bounty[]; trophies?: Trophies }
   | { t: 'market'; sectors: Record<string, number>; headline: string; season: { n: number; endsAt: number }; standing?: { score: number; rank: number; players: number; eligible: boolean } }
+  | { t: 'claimState'; ready: boolean; nextAt: number; streak: number; sap: number; seeds: number }
   | { t: 'pong'; n: number; now: number };
 
 // Phase one [TUNABLE]

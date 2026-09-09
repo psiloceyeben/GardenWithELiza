@@ -275,6 +275,19 @@ export class WorldState {
         this.market = { sectors: m.sectors, headline: m.headline, season: m.season, standing: m.standing };
         renderTape(this.market);
         break;
+      case "claimState": {
+        // The one button worth interrupting somebody for: light it when the claim is up,
+        // otherwise show the countdown so nobody has to work out when noon Pacific is.
+        const btn = document.getElementById("btn-daily");
+        if (btn) {
+          btn.classList.toggle("ready", m.ready);
+          btn.textContent = m.ready ? `${COPY.claim} +${m.sap}` : COPY.claim;
+          btn.title = m.ready
+            ? `${COPY.claimReady}: +${m.sap} Sap, ${m.seeds} seed(s). ${COPY.streak} ${m.streak}`
+            : `${COPY.claimAgain} ${new Date(m.nextAt).toLocaleTimeString()}`;
+        }
+        break;
+      }
       case "board":
         this.board = m.sprint;
         if (m.bounties) this.bounties = m.bounties;
@@ -472,6 +485,9 @@ export class WorldState {
     }
   }
   zoomLevel = 0;
+  /** Ask the server for the daily claim. It decides whether one is due. */
+  claimDaily(): void { this.net.send({ t: 'claim' }); }
+
   toggleZoom(): void {
     this.zoomLevel = (this.zoomLevel + 1) % 3;
   }

@@ -11,7 +11,7 @@ import { viewMode } from '../view-mode';
 import { wardrobeHtml } from './wardrobe';
 import { MISSIONS, npcById, type MissionView } from '@shared/missions';
 
-export type HudController = Pick<WorldState, 'ask' | 'board' | 'bounties' | 'buySeed' | 'carrying' | 'chat' | 'connectWallet' | 'cosmetic' | 'emote' | 'event' | 'feed' | 'frameRect' | 'goHome' | 'interactNearest' | 'joy' | 'mission' | 'nick' | 'onlineCount' | 'postBounty' | 'refreshVillages' | 'selectedSeed' | 'selectSeed' | 'shop' | 'sprintStartedAt' | 'toggleZoom' | 'trophies' | 'unlinkWallet' | 'villageId' | 'villageName' | 'villages' | 'visit' | 'wardrobe' | 'you'>;
+export type HudController = Pick<WorldState, 'ask' | 'board' | 'bounties' | 'buySeed' |  'carrying' | 'claimDaily' | 'chat' | 'connectWallet' | 'cosmetic' | 'emote' | 'event' | 'feed' | 'frameRect' | 'goHome' | 'interactNearest' | 'joy' | 'mission' | 'nick' | 'onlineCount' | 'postBounty' | 'refreshVillages' | 'selectedSeed' | 'selectSeed' | 'shop' | 'sprintStartedAt' | 'toggleZoom' | 'trophies' | 'unlinkWallet' | 'villageId' | 'villageName' | 'villages' | 'visit' | 'wardrobe' | 'you'>;
 
 type PanelId = 'conveyor' | 'seeds' | 'shop' | 'odds' | 'feed' | 'emotes' | 'land' | 'villages' | 'talk';
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -31,6 +31,8 @@ export class Hud {
     $('btn-conveyor').textContent = COPY.conveyorShort; $('btn-seeds').textContent = COPY.bag; $('btn-shop').textContent = COPY.shop;
     $('btn-feed').textContent = COPY.feed.split(' ')[1] ?? COPY.feed; $('btn-emotes').textContent = COPY.emotes; $('btn-odds').textContent = COPY.odds; $('btn-land').textContent = COPY.landTitle.split(' ')[1] ?? COPY.landTitle;
     $('btn-zoom').addEventListener('click', () => this.scene.toggleZoom()); $('btn-zoom').textContent = COPY.zoom;
+    $('btn-daily').addEventListener('click', () => this.scene.claimDaily());
+    $('btn-daily').textContent = COPY.claim;
     const mute = $('btn-mute'); const paintMute = () => { mute.textContent = sfx.muted ? '♪ ' + COPY.off : '♪ ' + COPY.on; }; paintMute();
     mute.addEventListener('click', () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); });
     const chat = $<HTMLInputElement>('chat'); chat.placeholder = COPY.chatPlaceholder;

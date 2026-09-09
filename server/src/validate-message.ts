@@ -38,7 +38,7 @@ export function isClientMsg(value: unknown): value is ClientMsg {
     case 'mission': return id(m.id) && (m.action === 'accept' || m.action === 'claim');
     case 'ask': return id(m.npc) && str(m.text, 1000) && (m.requestId === undefined || (str(m.requestId, 64) && /^[a-zA-Z0-9-]+$/.test(m.requestId)));
     case 'ping': return finite(m.n);
-    case 'cancel': case 'unlink': case 'sprint': case 'home': case 'villages': return true;
+    case 'cancel': case 'unlink': case 'sprint': case 'home': case 'villages': case 'claim': return true;
     default: return false;
   }
 }

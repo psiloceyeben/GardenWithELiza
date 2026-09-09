@@ -420,6 +420,9 @@ export class WorldScene extends Phaser.Scene {
   }
   /** Zoom: close (follows you) → half (follows you) → whole map (fixed) → close. The HUD is DOM so it stays crisp. */
   zoomLevel = 0;
+  /** Ask the server for the daily claim. It decides whether one is due. */
+  claimDaily(): void { this.net.send({ t: 'claim' }); }
+
   toggleZoom(): void {
     this.zoomLevel = (this.zoomLevel + 1) % 3;
     const cam = this.cameras.main;

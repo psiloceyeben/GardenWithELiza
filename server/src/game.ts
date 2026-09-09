@@ -23,6 +23,7 @@ import { seasonEnd, seasonNumberAt, bookValue, scoreOf, standings, SEASON_ONE_ST
 import { SECTORS } from '../../shared/roster';
 import { sectorMovePct } from '../../shared/market';
 import { requestBrief, logBrief, composeHeadline, BRIEF_INTERVAL_MS, type Brief } from './market-brief';
+import * as D from '../../shared/daily';
 import copyJson from '../../content/copy.json';
 
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
@@ -60,6 +61,8 @@ export interface PlayerRec {
   missions?: P.MissionState;    // town missions: active progress + day each was last completed
   carried?: { plant: Plant; from: string; fromPlot: number } | null;
   profile?: import('../../shared/season').PlayerProfile;   // season tally, history, endowment, vintages
+  lastClaim?: string;           // claim period key, noon PT to noon PT
+  claimStreak?: number;
   agent?: boolean;              // ElizaOS or other automated player; ranks publicly, never paid
 }
 const dayKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
@@ -334,6 +337,7 @@ export class Game {
     // throws, and the whole message loop dies with it - which is how the ticker banners
     // stopped appearing at all.
     this.send(ws, { t: 'toast', text: `Garden secure for ${Math.round(GRACE_MS / 60000)} minutes!` });
+    this.pushClaim(live, rec, now);
     if (off >= 1) this.send(ws, { t: 'toast', text: `${copyJson.ui.offlineBack} ${Math.floor(off)} ${copyJson.ui.sap}.` });
     this.broadcast(this.vid(rec), { t: 'players', names: { [id]: this.nameEntry(rec) } }, id);
     this.pushLot(rec);
@@ -542,6 +546,7 @@ export class Game {
       case 'talk': return this.onTalk(l, rec, String(m.npc), now);
       case 'mission': return this.onMission(l, rec, String(m.id), m.action === 'claim' ? 'claim' : 'accept', now);
       case 'ask': return this.onAsk(l, rec, String(m.npc), String(m.text), now, m.requestId);
+      case 'claim': return this.onClaim(l, rec, now);
       case 'ping': this.send(l.ws, { t: 'pong', n: m.n, now }); return;
     }
   }
@@ -634,6 +639,54 @@ export class Game {
     return !!p && Math.hypot(p.tx * TILE + 16 - l.x, p.ty * TILE + 16 - l.y) <= 40;
   }
 
+
+  /** Push the player's claim status: ready now, or when it next opens. */
+  pushClaim(l: Live, rec: PlayerRec, now: number): void {
+    const streak = rec.claimStreak ?? 0;
+    this.send(l.ws, {
+      t: 'claimState',
+      ready: D.canClaim(now, rec.lastClaim),
+      nextAt: now + D.msUntilClaim(now, rec.lastClaim),
+      streak,
+      sap: Math.round(D.claimSap(rec.plotCount) * D.streakMultiplier(streak)),
+      seeds: D.claimSeeds(rec.plotCount),
+    });
+  }
+
+  /**
+   * The daily claim, opening at noon Pacific. Server-authoritative and idempotent within a
+   * period: the period key is stored on the record, so a client that sends `claim` twice, or
+   * reconnects and tries again, gets nothing the second time.
+   */
+  onClaim(l: Live, rec: PlayerRec, now: number): void {
+    if (!D.canClaim(now, rec.lastClaim)) {
+      const mins = Math.ceil(D.msUntilClaim(now, rec.lastClaim) / 60_000);
+      this.send(l.ws, { t: 'toast', text: `${UI.claimAgain} ${fmt(mins * 60_000)}` });
+      return this.pushClaim(l, rec, now);
+    }
+
+    const streak = D.nextStreak(rec.claimStreak ?? 0, rec.lastClaim, now);
+    const sap = Math.round(D.claimSap(rec.plotCount) * D.streakMultiplier(streak));
+    const seedCount = D.claimSeeds(rec.plotCount);
+
+    rec.lastClaim = D.claimPeriod(now);
+    rec.claimStreak = streak;
+    this.addSap(rec, sap, `daily:${rec.lastClaim}`);
+
+    // Seeds respect the player's rarity floor, so a long holder's claim is better in kind
+    // and not merely in quantity.
+    for (let i = 0; i < seedCount; i++) {
+      const tier = E.rollTier(this.rng, rec.rarityFloor);
+      const pool = ROSTER.filter((s) => s.tier === tier && !s.hybrid);
+      const sp = pool[Math.floor(this.rng() * pool.length)] ?? ROSTER[0];
+      rec.seeds.push({ uid: uid('s'), speciesId: sp.id, tier: sp.tier });
+    }
+
+    this.store.touch();
+    this.pushState(rec, { sap: rec.sap, seeds: rec.seeds });
+    this.send(l.ws, { t: 'toast', text: `${UI.claimed}: +${sap} ${copyJson.ui.sap}, ${seedCount} seed(s). ${UI.streak} ${streak}` });
+    this.pushClaim(l, rec, now);
+  }
   onPlant(l: Live, rec: PlayerRec, seedUid: string, plotId: number, now: number): void {
     if (!this.canReachOwnPlot(l, rec, plotId)) return;
     const idx = rec.seeds.findIndex((s) => s.uid === seedUid);
