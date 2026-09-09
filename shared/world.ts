@@ -8,7 +8,7 @@ export const TILE = 32;
 // added in the ground to the east and south, so the hand-placed centre is untouched.
 export const VILLAGE_W = 208;
 export const VILLAGE_H = 140;
-export const LOTS_PER_VILLAGE = 48;
+export const LOTS_PER_VILLAGE = 56;
 export const LOT_W = 13;   // including fence ring
 export const LOT_H = 11;
 export const MAX_PLOTS = 20;
@@ -140,6 +140,10 @@ export function buildVillage(seed: number): Village {
   for (const x of [120, 136, 158, 174]) addLot(x, 76, 'top');
   for (const x of [120, 136, 158, 174]) addLot(x, 104, 'bottom');
 
+  // Middle south row, added 2026-09-09: fifty gardens open from the first day, so the
+  // village reads as a village on launch night rather than a street with sixteen houses.
+  for (const x of [30, 46, 62, 78, 120, 136, 158, 174]) addLot(x, 90, 'top');
+
   // props
   const props: Prop[] = [];
   const conveyor = { tx: 59, ty: 33 };
@@ -254,7 +258,7 @@ export function findPath(v: Village, from: { x: number; y: number }, to: { x: nu
  * Headroom is deliberate: always more open lots than players, so somebody joining right
  * now always has somewhere to go and never waits for a slot.
  */
-export const LOT_BASE = 16;
+export const LOT_BASE = 50;
 export const LOT_HEADROOM = 1.4;
 
 export function openLotCount(registeredPlayers: number): number {

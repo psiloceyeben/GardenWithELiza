@@ -8,137 +8,247 @@
 <meta property="og:title" content="Pons Garden">
 <meta property="og:description" content="Your land stays yours. Your plants do not.">
 <meta property="og:url" content="https://ponsgarden.com/">
+<meta property="og:image" content="https://ponsgarden.com/shots/01-garden.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <style>
   :root{
-    --bg:#1a1410; --bg2:#211a14; --panel:#241c16; --ink:#f0e8d2; --dim:#b9a98f;
-    --line:#3a2e24; --green:#8cd25a; --gold:#f0c040; --red:#e06666; --purple:#9646b4;
+    --cream:#f4e7cd; --cream2:#efdec0; --card:#faf1de;
+    --ink:#2f2318; --dim:#7a6952; --line:#d8c49c;
+    --brown:#7a4a22; --brown2:#5e3616;
+    --green:#4e8b34; --green2:#3c6d27; --gold:#c08a1e; --red:#b8452f;
     --mono:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 var(--mono);-webkit-font-smoothing:none}
-  a{color:var(--green)}
-  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
-  section{padding:64px 0;border-bottom:1px solid var(--line)}
-  h2{font-size:20px;margin:0 0 6px;letter-spacing:.5px}
-  h2 .num{color:var(--green);margin-right:10px}
-  .lede{color:var(--dim);margin:0 0 28px;max-width:70ch}
+  body{margin:0;background:var(--cream);color:var(--ink);font:15px/1.7 var(--mono)}
+  a{color:var(--green2)}
+  img{max-width:100%;height:auto;display:block;image-rendering:pixelated}
+  .wrap{max-width:1020px;margin:0 auto;padding:0 20px}
 
-  /* --- tape: the signature element, same as in-game ------------------------ */
-  #tape{position:sticky;top:0;z-index:20;background:#0b0908;border-bottom:2px solid var(--line);
-    font-size:10px;overflow:hidden;padding:5px 0}
-  #tape .row{display:inline-flex;gap:18px;white-space:nowrap;animation:tape 40s linear infinite}
+  /* ---- header ---- */
+  header{position:sticky;top:0;z-index:30;background:var(--brown);color:#f6e7c8;
+    border-bottom:3px solid var(--brown2)}
+  .bar{max-width:1020px;margin:0 auto;padding:9px 20px;display:flex;align-items:center;gap:14px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:1px;font-size:14px}
+  .brand svg{display:block}
+  .bar nav{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12px}
+  .bar nav a{color:#e8d3ac;text-decoration:none}
+  .bar nav a:hover{text-decoration:underline}
+  .online{color:#d8f0b8;white-space:nowrap}
+  .online b{color:#fff}
+  .enter{background:var(--green);color:#fff;padding:8px 16px;border:2px solid #24410f;
+    box-shadow:3px 3px 0 var(--brown2);text-decoration:none!important;font-weight:700;letter-spacing:.5px}
+  .enter:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--brown2)}
+
+  /* ---- ticker ---- */
+  #tape{background:#2f2318;color:#f4e7cd;font-size:10px;overflow:hidden;padding:5px 0;
+    border-bottom:2px solid var(--brown2)}
+  #tape .row{display:inline-flex;gap:18px;white-space:nowrap;animation:tape 44s linear infinite}
   .tk{flex:none;letter-spacing:.5px}
-  .up{color:var(--green)}.down{color:var(--red)}.flat{color:#8a7d6a}
+  .up{color:#8cd25a}.down{color:#e57a63}.flat{color:#9d8b70}
   @keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
-  /* --- hero ---------------------------------------------------------------- */
-  .hero{padding:76px 0 60px;text-align:center;background:
-    radial-gradient(900px 340px at 50% -10%, #2b2118 0%, transparent 70%)}
-  .hero h1{font-size:clamp(30px,6vw,58px);line-height:1.15;margin:0 0 18px;letter-spacing:-.5px}
-  .hero h1 em{font-style:normal;color:var(--green)}
-  .hero p{color:var(--dim);font-size:clamp(14px,2vw,17px);max-width:62ch;margin:0 auto 34px}
-  .cta{display:inline-block;background:var(--green);color:#12220a;font:700 20px/1 var(--mono);
-    padding:20px 44px;border:3px solid #12220a;box-shadow:6px 6px 0 #0b0908;text-decoration:none;
-    letter-spacing:1px;transition:transform .06s,box-shadow .06s}
-  .cta:hover{transform:translate(2px,2px);box-shadow:4px 4px 0 #0b0908}
-  .cta-sub{display:block;margin-top:16px;color:var(--dim);font-size:12px}
-  .live{display:inline-flex;align-items:center;gap:7px;color:var(--gold);font-size:12px;margin-bottom:22px}
+  /* ---- hero ---- */
+  .hero{padding:58px 0 44px;text-align:center;background:
+    linear-gradient(var(--cream2),var(--cream));border-bottom:1px solid var(--line)}
+  .hero h1{font-size:clamp(28px,5.4vw,52px);line-height:1.15;margin:0 0 16px}
+  .hero h1 em{font-style:normal;color:var(--green2)}
+  .hero p{color:var(--dim);font-size:clamp(14px,2vw,17px);max-width:60ch;margin:0 auto 30px}
+  .cta{display:inline-block;background:var(--green);color:#fff;font:700 20px/1 var(--mono);
+    padding:19px 42px;border:3px solid #24410f;box-shadow:6px 6px 0 var(--brown2);
+    text-decoration:none;letter-spacing:1px}
+  .cta:hover{transform:translate(2px,2px);box-shadow:4px 4px 0 var(--brown2)}
+  .cta-sub{display:block;margin-top:14px;color:var(--dim);font-size:12px}
+  .badge{display:inline-flex;align-items:center;gap:7px;color:var(--brown);font-size:12px;margin-bottom:18px}
   .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 1.6s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .shot{border:3px solid var(--brown2);box-shadow:8px 8px 0 rgba(94,54,22,.22);margin:28px auto 0}
+  .cap{color:var(--dim);font-size:11px;margin-top:8px;text-align:center}
+  /* Sprite showcase: one species per atlas row, 13 frames across, 32x48 each. */
+  .flora{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+  .sp{background:var(--card);border:1px solid var(--line);padding:10px 6px;text-align:center}
+  .sp .art{width:64px;height:96px;margin:0 auto;background-image:url(/sprites/plants.png);
+    background-repeat:no-repeat;background-size:832px 2880px;image-rendering:pixelated}
+  .sp .nm{font-size:10px;margin-top:6px;line-height:1.35;word-break:break-word}
+  .sp .tk2{font-size:9px;color:var(--brown);font-weight:700}
 
-  /* --- generic blocks ------------------------------------------------------ */
-  .grid{display:grid;gap:14px}
-  .g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-  .g3{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
-  .card{background:var(--panel);border:1px solid var(--line);padding:16px 18px}
-  .card h3{margin:0 0 6px;font-size:14px;color:var(--gold)}
+  /* ---- sections ---- */
+  section{padding:56px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:20px;margin:0 0 6px}
+  h2 .num{color:var(--green2);margin-right:10px}
+  .lede{color:var(--dim);margin:0 0 26px;max-width:70ch}
+  .split{display:grid;gap:26px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:center}
+  .grid{display:grid;gap:13px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);padding:15px 17px}
+  .card h3{margin:0 0 5px;font-size:14px;color:var(--brown)}
   .card p{margin:0;color:var(--dim);font-size:13px}
-  .step{display:flex;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .step{display:flex;gap:15px;padding:13px 0;border-bottom:1px solid var(--line)}
   .step:last-child{border-bottom:0}
-  .step .n{flex:none;width:34px;height:34px;display:grid;place-items:center;background:var(--green);
-    color:#12220a;font-weight:700}
-  .step b{display:block;margin-bottom:2px}
+  .step .n{flex:none;width:32px;height:32px;display:grid;place-items:center;background:var(--green);color:#fff;font-weight:700}
+  .step b{display:block}
   .step span{color:var(--dim);font-size:13px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card)}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
   th{color:var(--dim);font-weight:normal;font-size:11px;letter-spacing:.5px}
-  .t-common{color:#c8c8c8}.t-uncommon{color:#6cd46c}.t-rare{color:#4aa3ff}
-  .t-epic{color:#c26bff}.t-legendary{color:#ffb02e}.t-mythic{color:#ff4d6d}
-  .tick{color:var(--gold)}
-  .note{background:var(--bg2);border-left:3px solid var(--green);padding:14px 18px;margin:20px 0;color:var(--dim);font-size:13px}
+  .t-common{color:#7c7368}.t-uncommon{color:#4e8b34}.t-rare{color:#2f6fae}
+  .t-epic{color:#7b3fa8}.t-legendary{color:#c08a1e}.t-mythic{color:#b8452f}
+  .tick{color:var(--brown);font-weight:700}
+  .note{background:var(--card);border-left:4px solid var(--green);padding:13px 17px;margin:20px 0;color:var(--dim);font-size:13px}
   .note b{color:var(--ink)}
-  details{border-bottom:1px solid var(--line);padding:14px 0}
+  details{border-bottom:1px solid var(--line);padding:13px 0}
   summary{cursor:pointer;font-size:14px}
-  details p{color:var(--dim);font-size:13px;margin:10px 0 0;max-width:78ch}
-  footer{padding:44px 0 60px;color:var(--dim);font-size:12px}
+  details p{color:var(--dim);font-size:13px;margin:9px 0 0;max-width:78ch}
+  .ca{background:#2f2318;color:#f4e7cd;padding:13px 16px;font-size:12px;word-break:break-all;
+    border:2px solid var(--brown2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .ca b{color:var(--gold);flex:none}
+  footer{padding:40px 0 56px;color:var(--dim);font-size:12px;background:var(--cream2)}
   footer a{margin-right:16px}
-  .foot-note{margin-top:18px;max-width:80ch;line-height:1.8}
+  .foot-note{margin-top:16px;max-width:80ch;line-height:1.8}
   .center{text-align:center}
-  .mt{margin-top:34px}
+  /* Character picker. Sprites are farmer{shirt}{look}, 6x4, 32x32 frames, 16 to a row. */
+  .dressing{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:14px}
+  .mirror{width:128px;height:128px;display:grid;place-items:center;background:var(--card);
+    border:3px solid var(--brown2);box-shadow:5px 5px 0 rgba(94,54,22,.22)}
+  .me{width:96px;height:96px;background-image:url(/sprites/chars.png);background-repeat:no-repeat;
+    background-size:1536px 1248px;image-rendering:pixelated}
+  .arrow{background:var(--brown);color:#f6e7c8;border:2px solid var(--brown2);font:700 22px/1 var(--mono);
+    width:40px;height:40px;cursor:pointer;box-shadow:3px 3px 0 rgba(94,54,22,.3)}
+  .arrow:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 rgba(94,54,22,.3)}
+  .swatches{display:flex;gap:8px;justify-content:center;margin-top:6px}
+  .sw{width:26px;height:26px;border:2px solid var(--brown2);cursor:pointer;padding:0}
+  .sw[aria-pressed="true"]{outline:3px solid var(--green);outline-offset:2px}
 </style>
 </head>
 <body>
 
+<header>
+  <div class="bar">
+    <span class="brand">
+      <!-- pixel mark: a sprout in a pot with a ticker arrow -->
+      <svg width="22" height="22" viewBox="0 0 11 11" shape-rendering="crispEdges" aria-hidden="true">
+        <rect x="0" y="0" width="11" height="11" fill="#5e3616"/>
+        <rect x="5" y="2" width="1" height="5" fill="#4e8b34"/>
+        <rect x="3" y="3" width="2" height="1" fill="#8cd25a"/>
+        <rect x="6" y="4" width="2" height="1" fill="#8cd25a"/>
+        <rect x="3" y="2" width="1" height="1" fill="#8cd25a"/>
+        <rect x="7" y="3" width="1" height="1" fill="#8cd25a"/>
+        <rect x="2" y="7" width="7" height="1" fill="#c08a1e"/>
+        <rect x="3" y="8" width="5" height="2" fill="#7a4a22"/>
+      </svg>
+      PONS GARDEN
+    </span>
+    <nav>
+      <span class="online"><b id="online">—</b> in the village</span>
+      <a href="#how">How to play</a>
+      <a href="/rules.html">Rules</a>
+      <a class="enter" href="/play/">PLAY</a>
+    </nav>
+  </div>
+</header>
+
 <div id="tape"><div class="row" id="taperow"></div></div>
 
 <!-- ============================ HERO ============================ -->
-<div class="hero">
-  <div class="wrap">
-    <div class="live"><span class="dot"></span> SEASON 1 IS RUNNING</div>
-    <h1>Your land stays yours.<br><em>Your plants do not.</em></h1>
-    <p>Grow thirty listed companies as absurd little plants. They pay you every second they
-      are alive — which is exactly as long as your neighbours let them be.</p>
-    <a class="cta" href="/play/">PLAY NOW</a>
-    <span class="cta-sub">Free · no account · no download · runs in your browser</span>
+<div class="hero"><div class="wrap">
+  <div class="badge"><span class="dot"></span> SEASON 1 IS RUNNING</div>
+  <h1>Your land stays yours.<br><em>Your plants do not.</em></h1>
+  <p>Grow thirty listed companies as absurd little plants. They pay you every second they are
+    alive — which is exactly as long as your neighbours let them be.</p>
+  <a class="cta" href="/play/">PLAY NOW</a>
+  <span class="cta-sub">Free · no account · no download · runs in your browser</span>
+  <img class="shot" src="/shots/01-garden.png" alt="A garden in Pons Garden, with the plaza behind it" width="1600" height="900">
+  <div class="cap">Your lot, the path, and the plaza. Everyone else is one fence away.</div>
+</div></div>
+
+<!-- ============================ CHARACTER ============================ -->
+<section id="character"><div class="wrap center">
+  <h2 style="margin-bottom:6px">Pick who walks in</h2>
+  <p class="lede" style="margin:0 auto 26px">Six shirts, four looks. Choose here and you arrive
+    as them — you can change it later at the wardrobe.</p>
+
+  <div class="dressing">
+    <button class="arrow" id="prevLook" aria-label="Previous look">‹</button>
+    <div class="mirror"><div class="me" id="me"></div></div>
+    <button class="arrow" id="nextLook" aria-label="Next look">›</button>
   </div>
-</div>
 
-<!-- ============================ THE LOOP ============================ -->
-<section><div class="wrap">
+  <div class="swatches" id="shirts"></div>
+  <div class="cap" id="lookLabel">Look 1 of 24</div>
+
+  <p style="margin:26px 0 0"><a class="cta" href="/play/" id="playAs">PLAY AS THIS ONE</a></p>
+  <span class="cta-sub">Free · no account · no download</span>
+</div></section>
+
+<!-- ============================ HOW ============================ -->
+<section id="how"><div class="wrap">
   <h2><span class="num">01</span>How it works</h2>
-  <p class="lede">Six things. You will understand the game in about ninety seconds and still
-    be arguing about it in a week.</p>
+  <p class="lede">Six things. You will understand the game in ninety seconds and still be
+    arguing about it in a week.</p>
 
-  <div class="step"><div class="n">1</div><div>
-    <b>Buy a seed from the conveyor</b>
+  <div class="step"><div class="n">1</div><div><b>Buy a seed from the conveyor</b>
     <span>Six slots, refreshed every five minutes. Penny stocks are cheap and sprout in thirty
-      seconds. An index fund takes a quarter of an hour and pays 243 a second.</span></div></div>
-
-  <div class="step"><div class="n">2</div><div>
-    <b>Plant it and wait for the reveal</b>
+    seconds. An index fund takes a quarter of an hour and pays 243 a second.</span></div></div>
+  <div class="step"><div class="n">2</div><div><b>Plant it and wait for the reveal</b>
     <span>It pops with a size roll and a mutation roll. A Penny seed can reveal Screaming and
-      out-earn a Blue Chip. The odds are printed in the game.</span></div></div>
-
-  <div class="step"><div class="n">3</div><div>
-    <b>It pays, every second, online or not</b>
-    <span>Water it. Weed it. Leave it untended for twenty minutes and weeds halve its output
-      until you come back.</span></div></div>
-
-  <div class="step"><div class="n">4</div><div>
-    <b>Somebody walks into your garden</b>
+    out-earn a Blue Chip. The odds are printed in the game.</span></div></div>
+  <div class="step"><div class="n">3</div><div><b>It pays, every second, online or not</b>
+    <span>Water it, weed it. Leave it untended for twenty minutes and weeds halve its output
+    until you come back.</span></div></div>
+  <div class="step"><div class="n">4</div><div><b>Somebody walks into your garden</b>
     <span>Three seconds standing on your best plant and they are carrying it home. The whole
-      village gets the notice with your name in it.</span></div></div>
-
-  <div class="step"><div class="n">5</div><div>
-    <b>Chase them down and tag them</b>
+    village gets the notice with your name in it.</span></div></div>
+  <div class="step"><div class="n">5</div><div><b>Chase them down and tag them</b>
     <span>A tag returns the plant instantly and pays you a bounty. It is the hardest thing in
-      the game and the season scores it above stealing.</span></div></div>
-
-  <div class="step"><div class="n">6</div><div>
-    <b>Sunday: the bell</b>
+    the game and the season scores it above stealing.</span></div></div>
+  <div class="step"><div class="n">6</div><div><b>Sunday: the bell</b>
     <span>Every garden liquidates at whatever the market says in that exact second. Top three
-      split the pot. Then it all clears and starts again.</span></div></div>
+    split the pot. Then it clears and starts again.</span></div></div>
+</div></section>
+
+<!-- ============================ THE VILLAGE ============================ -->
+<section><div class="wrap">
+  <h2><span class="num">02</span>The village</h2>
+  <p class="lede">A plaza with a fountain, a town street to the north, and five keepers who
+    stand at their doors and hand out work.</p>
+  <div class="split">
+    <div>
+      <img class="shot" style="margin-top:0" src="/shots/03-town.png" alt="The town street and plaza" width="1600" height="900">
+    </div>
+    <div>
+      <div class="grid g2">
+        <div class="card"><h3>Mayor Gorm</h3><p>The hall, the notice board, the season standings.</p></div>
+        <div class="card"><h3>Seedwife Ada</h3><p>The conveyor, and opinions about your purchases.</p></div>
+        <div class="card"><h3>Bram the Barkeep</h3><p>Gossip, who robbed whom, the bounty board.</p></div>
+        <div class="card"><h3>Warden Pell</h3><p>Defence work, and the village sprint record.</p></div>
+        <div class="card"><h3>The Oracle</h3><p>Answers in character, and says so when it does not know.</p></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============================ THE MAP ============================ -->
+<section><div class="wrap">
+  <h2><span class="num">03</span>The map, and the gardens on it</h2>
+  <p class="lede">Fifty-six lots around the plaza and out along the east and south roads, fifty of them open
+    from the first day.
+    The rest open as people arrive, so the village stays walkable instead of becoming a field
+    of empty gardens nobody can be bothered to raid.</p>
+  <div class="split">
+    <div><img class="shot" style="margin-top:0" src="/shots/04-village.png" alt="The whole village, zoomed out" width="1600" height="900">
+      <div class="cap">The whole village, zoomed out.</div></div>
+    <div><img class="shot" style="margin-top:0" src="/shots/02-plots.png" alt="Plot rows inside a garden" width="1600" height="900">
+      <div class="cap">Ten plots to start, up to twenty if you hold.</div></div>
+  </div>
 </div></section>
 
 <!-- ============================ THE BOARD ============================ -->
 <section><div class="wrap">
-  <h2><span class="num">02</span>Thirty companies, all of them plants</h2>
+  <h2><span class="num">04</span>Thirty companies, all of them plants</h2>
   <p class="lede">Rarity is company strength. Meme names at the bottom, megacaps near the top,
-    index funds above them — and the whole risk curve is just how the game already worked.</p>
-
+    index funds above them.</p>
   <table>
     <tr><th>Tier</th><th>Grows in</th><th>Pays</th><th>Swings</th><th>Examples</th></tr>
     <tr><td class="t-common">Penny</td><td>30 s</td><td>1/sec</td><td>±60%</td>
@@ -154,70 +264,46 @@
     <tr><td class="t-mythic">Index</td><td>15 min</td><td>243/sec</td><td>±8%</td>
         <td><span class="tick">SPY</span> SP500plant · <span class="tick">BRK</span> BERKSHIREplant</td></tr>
   </table>
+  <div class="note"><b>Volatility moves by sector.</b> When semiconductors rip, every semi plant
+    in the village spikes at once and the whole plaza runs at the two gardens holding them. A
+    spiking plant glows, which makes it theft bait — that is the point.</div>
+  <p class="lede" style="margin-top:20px">Every company, sector and price movement is invented.
+    Nothing tracks a real security, share price or market feed.</p>
+</div></section>
 
-  <div class="note"><b>Volatility moves by sector.</b> When semiconductors rip, every semi
-    plant in the village spikes at once and the whole plaza runs at the two gardens holding
-    them. A spiking plant glows, which makes it theft bait — that is the point.</div>
-
-  <p class="lede" style="margin-top:22px">Every company, sector and price movement is invented.
-    Nothing here tracks a real security, a real share price or a real market feed. It is a
-    market that exists entirely inside a game about stealing plants.</p>
+<!-- ============================ THE FLORA ============================ -->
+<section><div class="wrap">
+  <h2><span class="num">05</span>The flora</h2>
+  <p class="lede">Thirty of them, drawn a pixel at a time. Every one is an original character —
+    no company logos, no brand artwork, just a plant with opinions.</p>
+  <div class="flora" id="flora"></div>
+  <div class="cap" style="text-align:left;margin-top:14px">Idle frames, straight out of the game's own sprite atlas.</div>
 </div></section>
 
 <!-- ============================ THE RAID ============================ -->
 <section><div class="wrap">
-  <h2><span class="num">03</span>Defending what you grew</h2>
-  <p class="lede">Everything below is bought with Sap you earned. None of it costs money,
-    because none of it can.</p>
+  <h2><span class="num">05</span>Defending what you grew</h2>
+  <p class="lede">All of it bought with Sap you earned. None of it costs money, because none of
+    it can.</p>
   <div class="grid g3">
-    <div class="card"><h3>Fence</h3><p>Three loud hits to break. The noise is the point — it
-      buys you time to get back.</p></div>
-    <div class="card"><h3>Gnome</h3><p>Patrols your lot on a route and tags thieves it
-      catches, whether you are there or not.</p></div>
-    <div class="card"><h3>Sprinkler</h3><p>Slows anyone carrying a plant across your ground.
-      Carriers are already slow.</p></div>
+    <div class="card"><h3>Fence</h3><p>Three loud hits to break. The noise buys you time.</p></div>
+    <div class="card"><h3>Gnome</h3><p>Patrols and tags thieves whether you are there or not.</p></div>
+    <div class="card"><h3>Sprinkler</h3><p>Slows anyone carrying a plant across your ground.</p></div>
     <div class="card"><h3>Bell</h3><p>Tells you the instant a stranger crosses your line.</p></div>
-    <div class="card"><h3>Mud patch</h3><p>Slows everyone, including you. Placement is the
-      entire skill.</p></div>
-    <div class="card"><h3>Scarecrow</h3><p>Looks exactly like a gnome to every other player.
-      Does absolutely nothing.</p></div>
+    <div class="card"><h3>Mud patch</h3><p>Slows everyone, including you. Placement is the skill.</p></div>
+    <div class="card"><h3>Scarecrow</h3><p>Looks exactly like a gnome to everyone else. Does nothing.</p></div>
   </div>
 </div></section>
 
-<!-- ============================ ORACLE ============================ -->
-<section><div class="wrap">
-  <h2><span class="num">04</span>The market has an author</h2>
-  <p class="lede">Most game economies are a random number generator with a nice font. This one
-    is written by <b style="color:var(--ink)">Oracle7</b>, our own model, which reads the
-    village and decides what the story is.</p>
-
-  <div class="note" style="border-left-color:var(--gold)">
-    <i>“SEMIS rips +6.2%. NVIDIAplant hums louder before it spikes, and the whole village
-    hears it.”</i><br>
-    <i>“FINANCIALS slips −4.1%. Nix took a GAMESTOPplant from Marla.”</i>
-  </div>
-
-  <div class="grid g2 mt">
-    <div class="card"><h3>Bounded</h3><p>Oracle7 supplies a position between −1 and 1. What
-      it multiplies comes from a published table the model cannot touch.</p></div>
-    <div class="card"><h3>Never in the payout path</h3><p>Standing is decided by what players
-      do. An outage can never become a prize dispute.</p></div>
-    <div class="card"><h3>Fully logged</h3><p>Every brief is written to the season log with its
-      inputs, so any result can be recomputed months later.</p></div>
-    <div class="card"><h3>Fails safe</h3><p>If the model is down the market falls back to a
-      deterministic walk in the same bands. The news just gets boring.</p></div>
-  </div>
-</div></section>
 
 <!-- ============================ SEASON ============================ -->
 <section><div class="wrap">
-  <h2><span class="num">05</span>The season, and the bell</h2>
+  <h2><span class="num">07</span>The season, and the bell</h2>
   <p class="lede">Seven days, Sunday to Sunday. Then every garden in the village liquidates at
     once.</p>
-
   <div class="grid g2">
-    <div class="card"><h3>Free to enter</h3><p>Nobody pays in. Nothing is pooled, staked or
-      wagered, and nothing is decided by a dice roll.</p></div>
+    <div class="card"><h3>Free to enter</h3><p>Nobody pays in. Nothing is pooled or staked, and
+      nothing is decided by a dice roll.</p></div>
     <div class="card"><h3>Decided by play</h3><p>Book value at the bell, plus steals, tags,
       missions and the sprint record. Every weight is published.</p></div>
     <div class="card"><h3>Top three split the pot</h3><p>50 / 30 / 20, funded by the studio.
@@ -225,17 +311,15 @@
     <div class="card"><h3>Everyone else settles</h3><p>Carry it for tempo, endow it into a
       permanent trickle, or burn it on a season vintage that can never be grown again.</p></div>
   </div>
-
-  <div class="note mt"><b>Raiding widely beats farming one neighbour.</b> Repeat steals from the
+  <div class="note"><b>Raiding widely beats farming one neighbour.</b> Repeat steals from the
     same player are worth 10, then 7, 5, 3. Being popular is not a punishment.</div>
 </div></section>
 
 <!-- ============================ HOLDING ============================ -->
 <section><div class="wrap">
-  <h2><span class="num">06</span>What holding does</h2>
+  <h2><span class="num">08</span>What holding does</h2>
   <p class="lede">Optional, and read-only. The game looks at a public wallet the way a block
-    explorer does. It never takes custody, never asks you to send or lock anything, and never
-    builds a transaction.</p>
+    explorer does. It never takes custody and never builds a transaction.</p>
   <table>
     <tr><th>The chain says</th><th>Your garden gets</th></tr>
     <tr><td>Held longer</td><td>More plots, from 10 up to 20</td></tr>
@@ -243,69 +327,40 @@
     <tr><td>Total time held</td><td>A conviction tree growing in your corner</td></tr>
     <tr><td>Each large past sell</td><td>A permanent stump on your fence, visible to every visitor</td></tr>
   </table>
-  <div class="note">Conviction is landscape. You cannot buy it, fake it, or clear it — and
+  <div class="ca"><b>CA</b><span id="ca">TBA — contract address will be posted here at launch</span></div>
+  <div class="note">Conviction is landscape. You cannot buy it, fake it or clear it — and
     everyone who walks past your gate can read it.</div>
 </div></section>
 
 <!-- ============================ FAQ ============================ -->
 <section><div class="wrap">
-  <h2><span class="num">07</span>Questions</h2>
-
+  <h2><span class="num">09</span>Questions</h2>
   <details><summary>Do I need a wallet or an account?</summary>
-    <p>No. Click play and you are gardening in about four seconds, with ten plots and the
-      whole game. A wallet is optional and only changes what your land looks like and whether
-      you are eligible for the seasonal prize.</p></details>
-
+    <p>No. Click play and you are gardening in about four seconds, with ten plots and the whole
+    game. A wallet is optional and only changes what your land looks like and whether you are
+    eligible for the seasonal prize.</p></details>
   <details><summary>Is this a way to earn money?</summary>
-    <p>No, and it does not describe itself as one. Sap is game currency: it is not
-      convertible, redeemable or withdrawable, and there is no rate at which it becomes
-      anything else. The only value that leaves is a fixed seasonal prize awarded by rank.</p></details>
-
+    <p>No, and it does not describe itself as one. Sap is game currency: it is not convertible
+    or redeemable, and there is no rate at which it becomes anything else. The only value that
+    leaves is a fixed seasonal prize awarded by rank.</p></details>
   <details><summary>Are the plants real stocks?</summary>
-    <p>No. The names are parody. Pons Garden is not affiliated with, endorsed by or connected
-      to any company a plant evokes, uses no company logos or artwork, and no plant tracks a
-      real security or price feed.</p></details>
-
+    <p>No. The names are parody. Pons Garden is not affiliated with, endorsed by or connected to
+    any company a plant evokes, uses no company logos or artwork, and no plant tracks a real
+    security or price feed.</p></details>
   <details><summary>Can somebody really steal my plants?</summary>
     <p>Yes, and they will. Your land, plot count and history cannot be taken — only what is
-      growing. New gardens are shielded for the first five minutes.</p></details>
-
+    growing. New gardens are shielded for the first five minutes.</p></details>
   <details><summary>Can AI agents play?</summary>
-    <p>Yes. There is an <a href="https://github.com/psiloceyeben/pons-garden">ElizaOS plugin</a>
-      so agents can join, farm and raid with exactly the abilities a human has. They rank on
-      the public board and are never eligible for the prize.</p></details>
-
+    <p>Yes. There is an ElizaOS plugin so agents can join, farm and raid with exactly the
+    abilities a human has. They rank on the public board and are never eligible for the prize.</p></details>
   <details><summary>What stops someone cheating?</summary>
     <p>Movement is server-authoritative with a distance budget, so nobody teleports, speeds up
-      or reaches through a fence. Steals are capped per hour per victim.</p></details>
-</div></section>
-
-<!-- ============================ TRUST ============================ -->
-<section><div class="wrap">
-  <h2><span class="num">08</span>What this site will never ask you for</h2>
-  <p class="lede">Pons Garden sits next to crypto, so it is worth being blunt about what it
-    does and does not do.</p>
-  <div class="grid g2">
-    <div class="card"><h3>Never a seed phrase</h3><p>No seed phrase, private key, password or
-      payment detail — not on this site, not in the game, not ever. Anyone asking you for one
-      in our name is not us.</p></div>
-    <div class="card"><h3>Never a transaction</h3><p>The game cannot construct, sign or relay
-      one. There is no code path in it that could move an asset.</p></div>
-    <div class="card"><h3>No custody</h3><p>We never hold your assets, your keys, or anything
-      else of yours. There is nothing here to withdraw because there is nothing here.</p></div>
-    <div class="card"><h3>Wallets are optional and in-game</h3><p>You can play the entire game
-      without one. If you link, the wallet is asked for your public address and a signature on
-      a plain sentence saying it is free and is not a transaction.</p></div>
-  </div>
-  <div class="note mt"><b>Who runs this:</b> Prometheus7 Research Institute, also at
-    <a href="https://prometheus7.com">prometheus7.com</a>. Security or impersonation reports:
-    see <a href="/.well-known/security.txt">security.txt</a> — we answer the same day.</div>
+    or reaches through a fence. Steals are capped per hour per victim.</p></details>
 </div></section>
 
 <!-- ============================ CTA ============================ -->
 <section class="center"><div class="wrap">
-  <h2 style="justify-content:center">Somebody is walking toward your gate right now</h2>
-  <p class="lede" style="margin:0 auto 28px">Free, instant, in the browser.</p>
+  <h2 style="margin-bottom:14px">Somebody is walking toward your gate right now</h2>
   <a class="cta" href="/play/">PLAY NOW</a>
 </div></section>
 
@@ -313,20 +368,23 @@
   <a href="/rules.html">Season Rules</a>
   <a href="/terms.html">Terms</a>
   <a href="/privacy.html">Privacy</a>
-  <a href="https://prometheus7.com">Prometheus7</a>
   <p class="foot-note">
     Pons Garden is a game. It is not an investment, not a financial product, and nothing here
     is financial advice. Plant names are parody and imply no affiliation with, endorsement by,
-    or connection to any real company. All in-game market movement is generated inside the
-    game and references no real security, price or market data feed.
+    or connection to any real company. All in-game market movement is generated inside the game
+    and references no real security, price or market data feed.
   </p>
-  <p class="foot-note" style="color:#6e6355">Built by Prometheus7 Research Institute ·
-    Powered by Oracle7 · built with the help of ELIZA</p>
+  <p class="foot-note" style="color:#8d7c64">built with the help of ELIZA</p>
 </div></footer>
 
 <script>
-  // Ticker: the same sectors the game runs, drifting so the page feels alive. Cosmetic
-  // only - the real tape is inside the game and comes from the server.
+  // Live village count.
+  fetch('/health').then(r => r.json()).then(d => {
+    const n = d.online ?? d.players ?? 0;
+    document.getElementById('online').textContent = n;
+  }).catch(() => { document.getElementById('online').textContent = '—'; });
+
+  // Ticker. Cosmetic: the real tape is inside the game and comes from the server.
   const SECTORS = ['SHELL','GRWTH','RETL','STPL','FIN','ENRG','SEMI','BIO','ADTC','FUND'];
   const hash = (s, n) => { let h = 2166136261 >>> 0; const t = s + ':' + n;
     for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; };
@@ -345,6 +403,85 @@
     }).join('');
     document.getElementById('taperow').innerHTML = html + html;
   }
+
+  // The flora showcase. Species order matches the roster, and the sprite atlas packs one
+  // species per row of 13 frames (5 grow, 6 idle, 2 wither) at 32x48. So row = index and
+  // the idle frames start at column 5. Rendered at 2x, hence the 832x2880 background size.
+  const FLORA = [
+    ['GAMESTOPplant','GME'],['AMCplant','AMC'],['NIKOLAplant','NKLA'],['WEWORKplant','WE'],
+    ['PELOTONplant','PTON'],['ROBINHOODplant','HOOD'],['PALANTIRplant','PLTR'],['RIVIANplant','RIVN'],
+    ['SNAPplant','SNAP'],['CHEWYplant','CHWY'],['STARBUCKSplant','SBUX'],['FORDplant','F'],
+    ['PFIZERplant','PFE'],['KROGERplant','KR'],['UPSplant','UPS'],['JPMORGANplant','JPM'],
+    ['COCACOLAplant','KO'],['DISNEYplant','DIS'],['WALMARTplant','WMT'],['JOHNSONplant','JNJ'],
+    ['NVIDIAplant','NVDA'],['APPLEplant','AAPL'],['TESLAplant','TSLA'],['AMAZONplant','AMZN'],
+    ['MICROSOFTplant','MSFT'],['SP500plant','SPY'],['VANGUARDplant','VOO'],['NASDAQplant','QQQ'],
+    ['BERKSHIREplant','BRK'],['GOLDplant','GLD'],
+  ];
+  const flora = document.getElementById('flora');
+  if (flora) {
+    flora.innerHTML = FLORA.map(([name, tk], i) =>
+      `<div class="sp"><div class="art" data-row="${i}" style="background-position:-320px ${-i * 96}px"></div>` +
+      `<div class="nm">${name}<br><span class="tk2">${tk}</span></div></div>`).join('');
+    // Idle animation: six frames, columns 5..10, stepped together so the row breathes.
+    let f = 0;
+    setInterval(() => {
+      f = (f + 1) % 6;
+      const x = -(5 + f) * 64;
+      for (const el of flora.querySelectorAll('.art')) {
+        el.style.backgroundPosition = `${x}px ${-el.dataset.row * 96}px`;
+      }
+    }, 180);
+  }
+
+  // ---- character picker -------------------------------------------------------------
+  // Sprites are farmer{shirt}{look}: shirt 0-5, look 0-3. Frames are 32x32, eight per
+  // character (down/up/side/carry x2), packed sixteen to an atlas row. Drawn at 3x, so the
+  // background is scaled to 1536x1248 and each step is 96px.
+  const SHIRT_HEX = ['#c0392b', '#2e86c1', '#27ae60', '#8e44ad', '#d4ac0d', '#d35400'];
+  const LOOKS = 4, SHIRTS = 6, COLS = 16, F = 96;
+  const look = { shirt: 0, variant: 0 };
+
+  try {
+    const saved = JSON.parse(localStorage.getItem('pons.look') || 'null');
+    if (saved && Number.isInteger(saved.shirt) && Number.isInteger(saved.variant)) {
+      look.shirt = Math.min(SHIRTS - 1, Math.max(0, saved.shirt));
+      look.variant = Math.min(LOOKS - 1, Math.max(0, saved.variant));
+    }
+  } catch { /* first visit, or storage blocked */ }
+
+  const me = document.getElementById('me');
+  const label = document.getElementById('lookLabel');
+  const shirtRow = document.getElementById('shirts');
+
+  function paintMe() {
+    if (!me) return;
+    const charIndex = look.shirt * LOOKS + look.variant;   // farmer00, farmer01, ... farmer53
+    const frame = charIndex * 8;                            // _down0 is the first of eight
+    me.style.backgroundPosition = `${-(frame % COLS) * F}px ${-Math.floor(frame / COLS) * F}px`;
+    if (label) label.textContent = `Look ${charIndex + 1} of ${SHIRTS * LOOKS}`;
+    for (const b of shirtRow ? shirtRow.children : []) {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.shirt) === look.shirt));
+    }
+    try { localStorage.setItem('pons.look', JSON.stringify(look)); } catch { /* fine */ }
+  }
+
+  if (shirtRow) {
+    shirtRow.innerHTML = SHIRT_HEX.map((hex, i) =>
+      `<button class="sw" data-shirt="${i}" style="background:${hex}" aria-pressed="false" aria-label="Shirt ${i + 1}"></button>`).join('');
+    shirtRow.addEventListener('click', (e) => {
+      const b = e.target.closest('.sw'); if (!b) return;
+      look.shirt = Number(b.dataset.shirt); paintMe();
+    });
+  }
+  const step = (d) => {
+    // Walk the whole 24 as one list, so the arrows browse every character.
+    let i = look.shirt * LOOKS + look.variant + d;
+    i = (i + SHIRTS * LOOKS) % (SHIRTS * LOOKS);
+    look.shirt = Math.floor(i / LOOKS); look.variant = i % LOOKS; paintMe();
+  };
+  document.getElementById('prevLook')?.addEventListener('click', () => step(-1));
+  document.getElementById('nextLook')?.addEventListener('click', () => step(1));
+  paintMe();
   paint(); setInterval(paint, 5000);
 </script>
 </body>

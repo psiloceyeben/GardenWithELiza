@@ -120,6 +120,18 @@ export class WorldState {
         this.villageName = m.village.name;
         this.villageBiome = m.village.biome;
         this.you = m.you;
+        // A look chosen on the landing page arrives here. Applied once, then cleared, so it
+        // never fights a change the player later makes at the wardrobe.
+        try {
+          const raw = localStorage.getItem("pons.look");
+          if (raw) {
+            const l = JSON.parse(raw) as { shirt?: number; variant?: number };
+            if (Number.isInteger(l.shirt) && Number.isInteger(l.variant)) {
+              this.net.send({ t: "wardrobe", shirt: l.shirt, skin: l.variant });
+            }
+            localStorage.removeItem("pons.look");
+          }
+        } catch { /* storage blocked, or nothing chosen */ }
         this.feed = m.feed;
         this.villages = m.villages;
         this.names = new Map(Object.entries(m.names));

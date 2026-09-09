@@ -35,7 +35,10 @@ const DEFAULT_PLOTS = 10; // Ben 2026-09-07: ten empty plots to start; existing 
 const GRACE_MS = Number(process.env.PONS_GRACE_MS ?? P.GRACE_MS);
 // How long a departed guest's garden survives so a reload or dropped connection can return to it.
 // After that it is deleted and the lot freed: only wallet-linked gardens persist (Ben, 2026-09-08).
-const GUEST_TTL_MS = Number(process.env.PONS_GUEST_TTL_MS ?? 3 * 60_000);
+// Closing the window should clear a guest garden promptly. The window is not zero because
+// a socket also drops on a reload, a tab restore or a few seconds of bad wifi, and wiping
+// somebody mid-refresh is a worse failure than a lot staying held for another half minute.
+const GUEST_TTL_MS = Number(process.env.PONS_GUEST_TTL_MS ?? 45_000);
 
 export interface PlayerRec {
   id: string; secret: string; name: string; color: number;
@@ -325,10 +328,12 @@ export class Game {
     if (rec.plotCount < DEFAULT_PLOTS) { while (rec.plots.length < DEFAULT_PLOTS) { rec.plots.push(null); rec.lockedUntil.push(0); } rec.plotCount = DEFAULT_PLOTS; this.store.touch(); }
     const spawn = this.spawnFor(rec);
     const live: Live = { id, ws, x: spawn.x, y: spawn.y, d: 'down', f: false, m: false, carry: null, channel: null, shieldUntil: now + GRACE_MS, lastInputAt: now, lastChatAt: 0, connectedAt: now, nonce: null, lastLot: -1, lastAskAt: 0 };
-    // Tell them plainly how long they are safe, rather than leaving it to be discovered.
-    this.send(ws, { t: 'toast', text: `Garden secure for ${Math.round(GRACE_MS / 60000)} minutes!` });
     this.live.set(id, live);
     this.sendWelcome(live, rec, now);
+    // AFTER the welcome, never before: a client that receives a toast with no state yet
+    // throws, and the whole message loop dies with it - which is how the ticker banners
+    // stopped appearing at all.
+    this.send(ws, { t: 'toast', text: `Garden secure for ${Math.round(GRACE_MS / 60000)} minutes!` });
     if (off >= 1) this.send(ws, { t: 'toast', text: `${copyJson.ui.offlineBack} ${Math.floor(off)} ${copyJson.ui.sap}.` });
     this.broadcast(this.vid(rec), { t: 'players', names: { [id]: this.nameEntry(rec) } }, id);
     this.pushLot(rec);

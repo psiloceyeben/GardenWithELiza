@@ -14,7 +14,7 @@ const SEEDS = [12345, 777, 42, 99001, 5];
 test('the map is about three times the original ground', () => {
   const ratio = (VILLAGE_W * VILLAGE_H) / (120 * 80);
   assert.ok(ratio >= 2.9, `map is only ${ratio.toFixed(2)}x the original`);
-  assert.equal(LOTS_PER_VILLAGE, 48);
+  assert.equal(LOTS_PER_VILLAGE, 56);
 });
 
 test('every seed builds the full set of lots, unique and in bounds', () => {
@@ -66,7 +66,7 @@ test('every lot gate is walkable from the plaza — nobody is stranded', () => {
 
 test('lots open with registrations, with headroom, and never exceed the map', () => {
   assert.equal(openLotCount(0), LOT_BASE, 'an empty village still shows a street of gardens');
-  assert.equal(openLotCount(LOT_BASE - 5), LOT_BASE, 'never fewer than the base');
+  assert.equal(openLotCount(5), LOT_BASE, 'a handful of players still see a full street');
   assert.ok(openLotCount(20) > 20, 'there must always be somewhere for the next player to go');
   assert.equal(openLotCount(9999), LOTS_PER_VILLAGE, 'capped at what the map actually holds');
   // Monotonic: more players never means fewer open lots.
