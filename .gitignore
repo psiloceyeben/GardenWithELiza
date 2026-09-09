@@ -3,3 +3,7 @@ dist/
 *.log
 .DS_Store
 tools/sprites/out/
+
+# Stray screen recordings and raw video captures
+screen-recorder-*.webm
+artifacts/promo/video/*.webm
