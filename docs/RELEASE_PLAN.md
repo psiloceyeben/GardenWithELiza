@@ -57,8 +57,16 @@ largest calendar item and the most parallelisable.
 moves. Tickers on fence signs and on the notice board. Cheapest thing in the design,
 highest larp return.
 
+**1.7 Oracle7 in the market loop.** The market-brief contract: village state in, sector
+moves plus headlines out, clamped to the published bands, logged to the season log, with a
+seeded deterministic fallback when the harness is slow, down or returns
+`withheld`/`clarification`. Extend the `:8099` corpus with market language. Four laws
+enforced in code and tested: bounded, never in the payout path, fully logged and
+reproducible, fails safe. See `GAME_DESIGN.md` §4b.
+
 **Exit:** volatility is deterministic and identical server-to-client, the roster flip test
-passes, and a full sector cycle has been observed live.
+passes, a full sector cycle has been observed live, and the market runs correctly for an
+hour with the Oracle harness deliberately stopped.
 
 ## 3. Phase 2 — The daily dividend
 

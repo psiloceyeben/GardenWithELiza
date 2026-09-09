@@ -189,6 +189,60 @@ half of the garden and the nonsense is the other.
 **The roster is a data file**, `content/roster.json`, with a schema and a lint. Names, art
 and flavour swap without touching a line of game code. See §10 for the naming decision.
 
+## 4b. Powered by Oracle7 — the market is authored, not rolled
+
+The market does not move at random. Every move is decided and explained by **Oracle7**, the
+alternate-architecture model running on its own instance beside the game, and that is what
+makes the tagline a statement of fact rather than a badge.
+
+**The market brief.** On each market tick Oracle7 receives the village state — sector
+positions, recent events, what has been stolen from whom, what is planted — and returns a
+brief: which sectors move, in which direction, in which magnitude band, and **the headline
+that explains it**. The tape then reads:
+
+> *Semis rip as Circuit Sequoia reports a hum of unprecedented volume.*
+> *Financials slip. Beargonia declined to comment, at length.*
+> *Rugg Capital halted after pulling its own roots up for the third time this week.*
+
+This is the difference between a market and a random number generator. Real markets feel
+like stories, and a story needs an author. Oracle7 is the author, and it is reading the
+actual village — the headline about a theft is about a theft that happened.
+
+**What Oracle7 drives:**
+
+- Sector moves and their direction and magnitude, within published bands.
+- The tape headlines and the notice board's market column.
+- Earnings-day copy, per company.
+- Which of the scheduled events fires, and its framing.
+- Keeper dialogue at the five doors, as it already does.
+- Mission text, generated against live village state.
+
+**What Oracle7 never touches**, and these are laws:
+
+1. **It cannot exceed the published bands.** Every brief is clamped to the odds table in
+   §4. Oracle7 chooses within the envelope; it cannot invent a move outside it. Players are
+   never subject to an unbounded model.
+2. **It is never in the payout path.** Season standing is player score — steals, tags,
+   defenses, missions, book value. Oracle7 influences the market everyone trades in
+   equally; it does not decide who wins. An outage must never become a prize dispute.
+3. **Every brief is logged.** Briefs are written to the season log with their inputs, so the
+   closing bell is reproducible after the fact and any settlement can be recomputed and
+   audited. Authored is not the same as unaccountable.
+4. **It fails safe.** If the harness is slow, down, or returns `withheld`/`clarification`,
+   the server falls back to a seeded deterministic walk within the same bands and the tape
+   runs neutral headlines. The game never blocks on the model. Players cannot tell that
+   anything is wrong, except that the news gets boring.
+
+**The instance.** Pons Garden already runs its own Oracle7 harness on `:8099`, compiled
+from the game's own lore. For the market layer that corpus extends to market language, so
+the model can write a plausible wire headline about a fictional semiconductor company
+without ever referencing a real price, a real feed or a real security.
+
+**Why it matters beyond the game.** This is the most legible public demonstration the
+Oracle line has: a model that is not a chat window, running a live economy in front of
+players who never see a prompt box, authoring events that thousands of people react to.
+"Powered by Oracle7" on the loading screen is a claim the season log can substantiate.
+
 ## 5. The village
 
 **Sixteen lots** around a plaza, deterministically generated from a seed so the server,
