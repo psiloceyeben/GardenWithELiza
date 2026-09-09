@@ -62,6 +62,7 @@ export interface PlayerRec {
   missions?: P.MissionState;    // town missions: active progress + day each was last completed
   carried?: { plant: Plant; from: string; fromPlot: number } | null;
   profile?: import('../../shared/season').PlayerProfile;   // season tally, history, endowment, vintages
+  account?: string;             // username, when this garden belongs to a mobile account
   shieldUntil?: number;         // new-garden grace, persisted so it survives a reconnect
   lastClaim?: string;           // claim period key, noon PT to noon PT
   claimStreak?: number;
@@ -498,7 +499,10 @@ export class Game {
     this.live.delete(id);
     rec.lastSeen = Date.now(); this.store.touch();
     if (!silent) { this.broadcast(this.vid(rec), { t: 'players', names: {}, left: [id] }); this.pushLot(rec); }
-    if (!rec.address) this.scheduleGuestPurge(id);
+    // An account is a reason to keep a garden, exactly like a wallet. Without this check a
+    // phone player would register, close the tab, and come back to nothing, which is the
+    // one thing accounts exist to prevent.
+    if (!rec.address && !rec.account) this.scheduleGuestPurge(id);
   }
 
   // ------------------------------------------------------------ ephemeral guest gardens
@@ -511,10 +515,10 @@ export class Game {
   cancelGuestPurge(id: string): void {
     const t = this.guestPurges.get(id); if (t) { clearTimeout(t); this.guestPurges.delete(id); }
   }
-  /** Delete a departed guest's record and free their lot. Never touches a wallet-linked player. */
+  /** Delete a departed guest. Never touches a wallet-linked player or an account holder. */
   purgeGuest(id: string): void {
     const rec = this.players.get(id);
-    if (!rec || rec.address || this.live.has(id)) return;   // linked, or they came back
+    if (!rec || rec.address || rec.account || this.live.has(id)) return;   // linked, has an account, or came back
     const villageId = rec.villageId; const now = Date.now();
     const lotMsg: ServerMsg = { t: 'lot', lot: this.publicLot(rec, now), removed: true };
     const village = this.villages.get(villageId);
@@ -533,12 +537,12 @@ export class Game {
   purgeStaleGuests(): void {
     let n = 0;
     for (const [id, rec] of [...this.players]) {
-      if (rec.address) continue;
+      if (rec.address || rec.account) continue;   // wallets and accounts both persist
       const village = this.villages.get(rec.villageId);
       if (village && village.lots[rec.lotId] === id) village.lots[rec.lotId] = null;
       this.players.delete(id); n += 1;
     }
-    if (n) { this.store.touch(); console.log(`startup: purged ${n} guest garden(s) — only wallet-linked gardens persist`); }
+    if (n) { this.store.touch(); console.log(`startup: purged ${n} guest garden(s) — wallets and accounts persist`); }
   }
 
   // ------------------------------------------------------------ messages

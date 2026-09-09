@@ -33,6 +33,12 @@
     #bar button { font-size:8px; padding:5px 7px; box-shadow:1px 1px 0 #000; }
   /* Ready state: the claim is the one button worth interrupting somebody for. */
   #btn-daily.ready { background:#8cd25a; color:#12220a; animation:dailypulse 1.8s ease-in-out infinite; }
+  /* Account form: keeps a phone garden between sessions without needing a wallet. */
+  #acct { margin-top:12px; padding-top:10px; border-top:1px solid var(--edge); }
+  #acct input { display:block; width:100%; margin:5px 0; }
+  .acct-row { display:flex; gap:6px; }
+  .acct-row button { flex:1; }
+  #acct-msg:empty { display:none; }
   @keyframes dailypulse { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.35)} }
     #panel { position:fixed; left:50%; bottom:calc(48px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(96vw,560px); max-height:66vh; overflow:auto; background:var(--panel); border:3px solid var(--edge); box-shadow:4px 4px 0 #000; padding:10px; z-index:5; }
     #panel[hidden] { display:none; }
@@ -141,7 +147,7 @@
   </div>
   <div id="panel" hidden><h2><span id="panel-title"></span><button id="panel-close">X</button></h2><div id="panel-body"></div></div>
   <div id="modal" hidden><div class="card" id="modal-card"></div></div>
-  <div id="name-modal" hidden><div class="card"><h3 id="name-title"></h3><input id="name-input" maxlength="16" autocomplete="off" /><div id="wallets"></div><p class="note" id="name-hint"></p><p class="note" id="name-or"></p><button id="name-go"></button></div></div>
+  <div id="name-modal" hidden><div class="card"><h3 id="name-title"></h3><input id="name-input" maxlength="16" autocomplete="off" /><div id="wallets"></div><p class="note" id="name-hint"></p><button id="name-go"></button><div id="acct"><p class="note" id="acct-lead"></p><input id="acct-user" maxlength="16" autocomplete="username" placeholder="username" /><input id="acct-pass" type="password" maxlength="64" autocomplete="current-password" placeholder="password" /><div class="acct-row"><button id="acct-login"></button><button id="acct-register"></button></div><p class="note" id="acct-msg"></p></div><p class="note" id="name-or"></p></div></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

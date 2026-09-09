@@ -131,6 +131,8 @@ export type ClientMsg =
   | { t: 'tradeSap'; sap: number }
   | { t: 'tradeConfirm'; confirmed: boolean }
   | { t: 'tradeClose' }
+  | { t: 'register'; username: string; password: string }
+  | { t: 'login'; username: string; password: string }
   | { t: 'ping'; n: number };
 
 export interface MissionState { active: Record<string, number>; done: Record<string, string>; }   // done[id] = day key
@@ -167,6 +169,7 @@ export type ServerMsg =
   | { t: 'market'; sectors: Record<string, number>; headline: string; season: { n: number; endsAt: number }; standing?: { score: number; rank: number; players: number; eligible: boolean } }
   | { t: 'claimState'; ready: boolean; nextAt: number; streak: number; sap: number; seeds: number }
   | { t: 'trade'; session: TradeView | null; message?: string }
+  | { t: 'account'; ok: boolean; username?: string; id?: string; secret?: string; error?: string }
   | { t: 'pong'; n: number; now: number };
 
 // Phase one [TUNABLE]

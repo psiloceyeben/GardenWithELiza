@@ -90,10 +90,48 @@ export class WorldState {
     const id = loadIdentity();
     if (id) this.connect(id);
     else
-      this.hud.askName((name, wallet) => {
-        this.pendingWallet = wallet;
-        this.connect(newIdentity(name));
-      });
+      this.hud.askName(
+        (name, wallet) => { this.pendingWallet = wallet; this.connect(newIdentity(name)); },
+        (mode, username, password) => this.accountRequest(mode, username, password),
+      );
+  }
+
+  /**
+   * Open a socket purely to register or log in. The server answers before hello, hands back
+   * the id/secret pair the game already uses for identity, and we then connect properly with
+   * it. Keeping accounts on the same socket avoids a second endpoint and a second origin.
+   */
+  private accountSocket: Net | null = null;
+  accountRequest(mode: "login" | "register", username: string, password: string): void {
+    if (username.length < 3 || password.length < 8) {
+      this.hud.accountMessage(username.length < 3 ? COPY.acctBadUsername : COPY.acctBadPassword);
+      return;
+    }
+    try { this.accountSocket?.close(); } catch { /* first attempt */ }
+    const net = new Net(wsUrl());
+    this.accountSocket = net;
+    net.onOpen = () => net.send({ t: mode, username, password });
+    net.onMsg = (m) => {
+      if (m.t !== "account") return;
+      if (!m.ok) {
+        const map: Record<string, string> = {
+          "bad-username": COPY.acctBadUsername, "bad-password": COPY.acctBadPassword,
+          taken: COPY.acctTaken, "no-such-account": COPY.acctNoAccount,
+          "wrong-password": COPY.acctWrong, "rate-limited": COPY.acctLimited,
+        };
+        this.hud.accountMessage(map[String(m.error)] ?? String(m.error));
+        return;
+      }
+      // Identity in hand: close the throwaway socket and connect for real.
+      try { net.close(); } catch { /* already closing */ }
+      this.accountSocket = null;
+      const id = { id: m.id!, secret: m.secret!, name: m.username! };
+      saveIdentity(id);
+      this.hud.hideNameModal();
+      this.hud.toast(COPY.acctWelcome);
+      this.connect(id);
+    };
+    net.connect();
   }
   connect(id: Identity): void {
     this.identity = id;

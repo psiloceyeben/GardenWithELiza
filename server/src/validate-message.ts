@@ -39,6 +39,7 @@ export function isClientMsg(value: unknown): value is ClientMsg {
     case 'ask': return id(m.npc) && str(m.text, 1000) && (m.requestId === undefined || (str(m.requestId, 64) && /^[a-zA-Z0-9-]+$/.test(m.requestId)));
     case 'ping': return finite(m.n);
     case 'cancel': case 'unlink': case 'sprint': case 'home': case 'villages': case 'claim': case 'tradeClose': return true;
+    case 'register': case 'login': return typeof m.username === 'string' && m.username.length > 0 && m.username.length <= 32 && typeof m.password === 'string' && m.password.length > 0 && m.password.length <= 200;
     case 'tradeOpen': return typeof m.playerId === 'string' && m.playerId.length > 0 && m.playerId.length <= 64;
     case 'tradeOffer': return (m.kind === 'seed' || m.kind === 'plant') && typeof m.uid === 'string' && m.uid.length > 0 && m.uid.length <= 64 && typeof m.add === 'boolean';
     case 'tradeSap': return finite(m.sap) && m.sap >= 0;

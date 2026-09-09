@@ -1,7 +1,9 @@
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { Game } from './game';
+import { AccountStore } from './accounts';
 import * as P from '../../shared/protocol';
 import { isClientMsg } from './validate-message';
 import { deriveGarden } from '../../shared/derive';
@@ -14,6 +16,7 @@ import { SignupBudget } from './signup-budget';
 
 const PORT = Number(process.env.PONS_PORT ?? 8130);
 const DATA = process.env.PONS_DATA ?? path.resolve(__dirname, '../../../../data');
+/** Username/password accounts, kept beside the game data. Passwords are never stored. */const accounts = new AccountStore(DATA);
 const SPRITES = process.env.PONS_SPRITES ?? path.resolve(__dirname, '../../../../client/public/sprites');
 const PUBLIC_BASE = (process.env.PONS_PUBLIC_BASE ?? 'https://prometheus7.com/ponsgarden').replace(/\/$/, '');
 const allowOrigin = originPolicy(PUBLIC_BASE, process.env.PONS_ALLOWED_ORIGINS);
@@ -79,9 +82,39 @@ wss.on('connection', (ws: WebSocket) => {
     let m: unknown; try { m = JSON.parse(String(raw)); } catch { ws.close(1008, 'invalid message'); return; }
     if (!isClientMsg(m)) { ws.close(1008, 'invalid message'); return; }
     if (!liveId) {
+      // Accounts are handled BEFORE hello. Register and login hand back the id/secret pair
+      // the game already uses for identity; the client then says hello with it. That gives
+      // a phone player a garden that survives closing the tab, without needing a wallet.
+      if (m.t === 'register' || m.t === 'login') {
+        if (!signupBudget.take(now)) { ws.close(1013, 'too many attempts; retry later'); return; }
+        const r = m.t === 'register'
+          ? accounts.register(
+              m.username, m.password,
+              // Alphanumeric only: the hello validator rejects underscores, and an id it
+              // rejects closes the socket with no message the player can act on.
+              'm' + randomUUID().replace(/-/g, '').slice(0, 15),
+              randomUUID().replace(/-/g, ''),
+              now,
+            )
+          : accounts.login(m.username, m.password, now);
+        ws.send(JSON.stringify(r.ok
+          ? { t: 'account', ok: true, username: r.account.username, id: r.account.playerId, secret: r.account.secret }
+          : { t: 'account', ok: false, error: r.error }));
+        return;
+      }
       if (m.t !== 'hello') { ws.close(1008, 'hello required'); return; }
-      if (!game.players.has(m.id) && !signupBudget.take(now)) { ws.close(1013, 'new gardens busy; retry later'); return; }
-      try { const l = game.join(ws, m); if (l) { liveId = l.id; lifecycle.authenticate(); } else ws.close(1008, 'invalid hello'); }
+      try {
+        const l = game.join(ws, m);
+        if (l) {
+          liveId = l.id;
+          // Mark account-owned gardens so the guest purge leaves them alone. Without this a
+          // phone player registers, closes the tab, and comes back to nothing.
+          const rec = game.players.get(l.id);
+          const username = accounts.usernameFor(l.id);
+          if (rec && username && rec.account !== username) { rec.account = username; game.store.touch(); }
+          lifecycle.authenticate();
+        } else ws.close(1008, 'invalid hello');
+      }
       catch { ws.close(1008, 'invalid hello'); }
       return;
     }

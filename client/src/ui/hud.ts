@@ -65,16 +65,36 @@ export class Hud {
     document.body.append(dialog);dialog.showModal();button.focus();
   }
 
-  askName(cb: (name: string, walletId: string | null) => void): void {
-    const m = $('name-modal'); m.hidden = false;
-    $('name-title').textContent = COPY.signIn; $('name-go').textContent = COPY.guestEnter; $('name-or').textContent = COPY.orGuest; $('name-hint').textContent = COPY.walletHint;
-    $('wallets').innerHTML = this.walletButtons();
-    const inp = $<HTMLInputElement>('name-input'); inp.placeholder = COPY.namePrompt;
-    const nameOf = () => inp.value.replace(/[^\w \-'.]/g, '').trim().slice(0, 16);
+  askName(cb: (name: string, walletId: string | null) => void, account?: (mode: "login" | "register", username: string, password: string) => void): void {
+    const m = $("name-modal"); m.hidden = false;
+    $("name-title").textContent = COPY.signIn; $("name-go").textContent = COPY.guestEnter; $("name-or").textContent = COPY.orGuest; $("name-hint").textContent = COPY.walletHint;
+    $("wallets").innerHTML = this.walletButtons();
+    const inp = $<HTMLInputElement>("name-input"); inp.placeholder = COPY.namePrompt;
+    const nameOf = () => inp.value.replace(/[^w -@'.]/g, "").trim().slice(0, 16);
     const go = () => { const n = nameOf(); if (n.length < 2) { inp.focus(); return; } m.hidden = true; cb(n, null); };
-    $('name-go').addEventListener('click', go); inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' || e.keyCode === 13) go(); });
-    $('wallets').querySelectorAll<HTMLButtonElement>('[data-wallet]').forEach((b) => b.addEventListener('click', () => { const n = nameOf() || `Gardener ${Math.floor(Math.random() * 900 + 100)}`; m.hidden = true; cb(n, b.dataset.wallet!); }));
+    $("name-go").addEventListener("click", go); inp.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter" || e.keyCode === 13) go(); });
+    $("wallets").querySelectorAll<HTMLButtonElement>("[data-wallet]").forEach((b) => b.addEventListener("click", () => { const n = nameOf() || `Gardener ${Math.floor(Math.random() * 900 + 100)}`; m.hidden = true; cb(n, b.dataset.wallet!); }));
+
+    // Account form. Optional, and pointed at phones: a garden that is still there tomorrow
+    // without asking somebody to install a wallet first.
+    $("acct-lead").textContent = COPY.acctLead;
+    $("acct-login").textContent = COPY.acctLogin;
+    $("acct-register").textContent = COPY.acctRegister;
+    const user = $<HTMLInputElement>("acct-user"), pass = $<HTMLInputElement>("acct-pass");
+    for (const el of [user, pass]) el.addEventListener("keydown", (e) => e.stopPropagation());
+    const submit = (mode: "login" | "register") => () => {
+      if (!account) return;
+      $("acct-msg").textContent = "";
+      account(mode, user.value.trim(), pass.value);
+    };
+    $("acct-login").addEventListener("click", submit("login"));
+    $("acct-register").addEventListener("click", submit("register"));
+    pass.addEventListener("keydown", (e) => { if (e.key === "Enter") submit("login")(); });
   }
+
+  /** Show an account error in the modal without closing it. */
+  accountMessage(text: string): void { $("acct-msg").textContent = text; }
+  hideNameModal(): void { $("name-modal").hidden = true; }
 
   /**
    * Wallet buttons - ONLY for wallets actually present in this browser.
