@@ -18,6 +18,8 @@ import * as Oracle from './oracle';
 import { NPCS, MISSIONS, MISSION_MAX_ACTIVE, npcById, type MissionKind, type MissionView } from '../../shared/missions';
 import { ROSTER } from './roster';
 import { LEGACY_SPECIES } from '../../shared/roster';
+import { currentProfile, recordSteal, recordTag, recordMission, runBell, writeLedgerRow, dueBellSeason } from './season';
+import { seasonEnd } from '../../shared/season';
 import copyJson from '../../content/copy.json';
 
 const SP = new Map(ROSTER.map((s) => [s.id, s]));
@@ -231,6 +233,7 @@ export class Game {
     } else {
       if ((ms.active[m.id] ?? -1) < m.target) return;
       delete ms.active[m.id]; ms.done[m.id] = today; this.addSap(rec, m.reward, `mission:${m.id}`);
+      rec.profile = recordMission(currentProfile(rec.profile, now));   // season scoring
       this.send(l.ws, { t: 'toast', text: `${UI.missionDone}: ${m.title} (+${m.reward} ${copyJson.ui.sap})` });
       this.send(l.ws, { t: 'say', npc: m.npc, name: npcById(m.npc)!.name, text: m.done, oracle: false });
     }
@@ -733,6 +736,7 @@ export class Game {
     this.returnPlant(owner, c);
     if (bounty && tagger) {
       const b = Math.max(P.BOUNTY_MIN, Math.floor(E.sapPerSec(c.plant, sp) * P.BOUNTY_SEC)); this.addSap(tagger, b, 'bounty'); tagger.stats.tags += 1; this.weekly(tagger, now).tags += 1;
+      tagger.profile = recordTag(currentProfile(tagger.profile, now));   // season scoring
       this.feed(this.vid(thief), 'tag', `${tagger.name} tagged ${thief.name} and got the ${this.plantName(c.plant)} back (+${b} Sap)`);
       const posted = this.bountyOn(thief, now);
       if (posted) {
@@ -751,6 +755,7 @@ export class Game {
     l.carry = null; this.send(l.ws, { t: 'carry', speciesId: null });
     thief.carried = null;
     const sp = SP.get(c.plant.speciesId)!; c.plant.lastWeeded = now; thief.plots[free] = c.plant; thief.stats.steals += 1;
+    thief.profile = recordSteal(currentProfile(thief.profile, now), c.from);   // season scoring, decays per victim
     const wk = this.weekly(thief, now); wk.steals += 1; if (E.tierIndex(c.plant.tier) > wk.heistTier) { wk.heistTier = E.tierIndex(c.plant.tier); wk.heistSpecies = c.plant.speciesId; }
     const owner = this.players.get(c.from);
     if (owner) {
@@ -800,6 +805,51 @@ export class Game {
     }
   }
 
+
+  /**
+   * Season bell. Called once a minute; settles at most one season per call, oldest first.
+   *
+   * The last-settled marker is the MAX across players, so a newcomer whose profile starts
+   * at 0 cannot re-trigger seasons that already closed. applySettlement is idempotent, so
+   * even if it did, nobody would be paid twice.
+   */
+  runBellIfDue(now: number): void {
+    const settled = Math.max(0, ...[...this.players.values()].map((r) => r.profile?.settledSeason ?? 0));
+    const season = dueBellSeason(settled, now);
+    if (!season) return;
+    const bellAt = seasonEnd(season);
+    const entrants = [...this.players.values()];
+    if (!entrants.length) return;
+
+    const result = runBell(
+      entrants.map((r) => ({
+        id: r.id, name: r.name, plots: r.plots,
+        profile: currentProfile(r.profile, bellAt),
+        // D-2: both stay 0 until the chain reader is live, so nobody is prize-eligible
+        // yet. Standings and settlement still run; only the payout list is empty.
+        ponsGarden: 0, pons: 0,
+      })),
+      season, bellAt, (id) => SP.get(id),
+    );
+
+    for (const st of result.standings) {
+      const rec = this.players.get(st.playerId);
+      if (!rec) continue;
+      rec.profile = result.profiles[st.playerId];
+      const award = result.sapAwards[st.playerId] ?? 0;
+      if (award) this.addSap(rec, award, `season:${season}:settle`);
+      rec.plots = rec.plots.map(() => null);   // the bell clears the board
+      const live = this.live.get(rec.id);
+      if (live) {
+        this.pushState(rec, { sap: rec.sap, plots: rec.plots });
+        this.send(live.ws, { t: 'toast', text: `Season ${season} closed - you placed #${st.rank}` });
+      }
+    }
+
+    try { writeLedgerRow(process.env.PONS_DATA ?? '.', result); }
+    catch { console.error('prize ledger write failed'); }
+    console.log(`season ${season} settled: ${result.standings.length} players, ${result.payouts.length} in the money`);
+  }
   snapshot(now: number): void {
     for (const vid of this.villages.keys()) {
       const p = this.snapOf(vid, now); if (p.length) this.broadcast(vid, { t: 'snap', now, p });
